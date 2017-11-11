@@ -37,6 +37,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
 
+import tools.stio.atlas.Atlas.Tools;
+
 /**
  * @author Oleg Orlov
  * @since  15 Jun 2015
@@ -137,7 +139,7 @@ public class AtlasImageView extends View {
 
     private void setupPaints() {
         this.defaultLayerType = getLayerType();
-        debugTextPaint.setTextSize(Atlas.Tools.getPxFromDp(10, getContext()));
+        debugTextPaint.setTextSize(Tools.dp2px((float) 10, getContext()));
     }
     
     //
@@ -251,7 +253,7 @@ public class AtlasImageView extends View {
         if (debugOutline) {
             float lineHeight = debugTextPaint.getFontMetrics().descent - debugTextPaint.getFontMetrics().ascent;
 
-            float x = Atlas.Tools.getPxFromDp(20, getContext());
+            float x = Tools.dp2px((float) 20, getContext());
             float y = getHeight() - lineHeight * 5;
             
             canvas.drawText(String.format("1: %.1fx%.1f", lastTouch1x, lastTouch1y), x, y, debugTextPaint); y += lineHeight;

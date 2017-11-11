@@ -25,6 +25,8 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
 
+import tools.stio.atlas.Atlas.Tools;
+
 /**
  * @author Oleg Orlov
  * @since  09 Jun 2015
@@ -71,8 +73,8 @@ public class AtlasProgressView extends View {
         
         int w = MeasureSpec.getSize(widthMeasureSpec);
         int h = MeasureSpec.getSize(heightMeasureSpec);
-        int defaultWidth =  (int) Atlas.Tools.getPxFromDp(getDefaultWidthDp(), getContext());
-        int defaultHeight = (int) Atlas.Tools.getPxFromDp(getDefaultHeightDp(), getContext());
+        int defaultWidth =  (int) Tools.dp2px(getDefaultWidthDp(), getContext());
+        int defaultHeight = (int) Tools.dp2px(getDefaultHeightDp(), getContext());
 
         if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY && MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) {
             setMeasuredDimension(w, h);
@@ -130,14 +132,14 @@ public class AtlasProgressView extends View {
         float viewHeight = getHeight();
         
         float outerRadiusPx = (viewWidth + viewHeight) / 2;// + viewHeight;
-        float innerRadiusPx = Atlas.Tools.getPxFromDp(pieRadiusDp, getContext());
+        float innerRadiusPx = Tools.dp2px(pieRadiusDp, getContext());
         float centerX = viewWidth / 2;
         float centerY = viewHeight / 2;
 
         pieBounds.set(centerX - innerRadiusPx, centerY - innerRadiusPx, centerX + innerRadiusPx, centerY + innerRadiusPx);
         canvas.drawArc(pieBounds, -90 + (360 * progress), 360 - (360 * progress) , true, piePaint);   // sweepAngle is a diff, not absolute value
-        
-        float ringInnerRadiusPx = innerRadiusPx + Atlas.Tools.getPxFromDp(spacingWidthDp, getContext());
+
+        float ringInnerRadiusPx = innerRadiusPx + Tools.dp2px(spacingWidthDp, getContext());
         
         // calculate ring parameters
         float ringRadiusPx = 0.5f * (ringInnerRadiusPx + outerRadiusPx);

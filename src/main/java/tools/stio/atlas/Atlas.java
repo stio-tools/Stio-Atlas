@@ -369,13 +369,23 @@ public class Atlas {
             return result;
         }
 
-        public static float getPxFromDp(float dp, Context context) {
-            return getPxFromDp(dp, context.getResources().getDisplayMetrics());
+        public static float dp2px(float dp, Context context) {
+            return dp2px(dp, context.getResources().getDisplayMetrics());
         }
 
-        public static float getPxFromDp(float dp, DisplayMetrics displayMetrics) {
+        public static float dp2px(float dp, DisplayMetrics displayMetrics) {
             return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, displayMetrics);
         }
+
+        public static float px2dp(float px, Context ctx) {
+            return px2dp(px, ctx.getResources().getDisplayMetrics());
+        }
+
+        public static float px2dp(float px, DisplayMetrics displayMetrics) {
+            double ratio = 1.0 / dp2px(1, displayMetrics);
+            return (float) (px * ratio);
+        }
+
 
         public static View findChildById(ViewGroup group, int id) {
             for (int i = 0; i < group.getChildCount(); i++) {
