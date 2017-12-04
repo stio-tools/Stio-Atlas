@@ -26,6 +26,8 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
@@ -42,6 +44,8 @@ import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -52,9 +56,15 @@ import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
+import java.net.Socket;
 import java.net.URL;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -64,10 +74,17 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import tools.stio.atlas.Dt.AdapterOnItem;
 import tools.stio.atlas.Dt.Log;
@@ -444,8 +461,383 @@ public class Atlas {
             return toStringSpec(widthSpec) + "|" + toStringSpec(heightSpec);
         }
 
+        //---------------------------          ----------------------//
+        private static final Handler uiHandler = new Handler(Looper.getMainLooper());
+        private static final ExecutorService httpExecutor = Executors.newCachedThreadPool();
+
+        public static void http(Request req, Callback callback) {
+            req.callback = callback;
+            httpExecutor.execute(req);
+        }
+
+        public static class Request implements Runnable {
+
+            /** TODO: state guards */
+            public final void run() {
+                // no response means .run() first time => execute in background
+                if (this.rsp == null) {
+                    this.rsp = http(url, httpMethod, headers, body);
+                    if (callback != null) {
+                        uiHandler.post(this);
+                    }
+                    // executing callback
+                } else if (callback != null) {
+                    callback.onComplete(this, rsp, rsp.exception);
+                } else {
+                    throw new IllegalStateException("No callback found. Request cannot be executed twice: " + rsp);
+                }
+            }
+
+            public static Request get(String url) {
+                return new Request(url, HTTP_GET, null, null);
+            }
+
+            public static Request post(String url) {
+                return new Request(url, HTTP_POST, null, null);
+            }
+
+            public static Request put(String url) {
+                return new Request(url, HTTP_PUT, null, null);
+            }
+
+            private String url;
+            private String httpMethod;
+            private String[] headers;
+            private byte[] body;
+
+            private Response rsp;
+            private Callback callback;
+
+
+            public Request(String url, String httpMethod, String[] headers, byte[] body) {
+                this.url = url;
+                this.httpMethod = httpMethod;
+                this.headers = headers;
+                this.body = body;
+            }
+
+            public Request headers(String... headers) {
+                checkHeaders(headers);
+                this.headers = headers;
+                return this;
+            }
+
+            public Request send(byte[] body) {
+                this.body = body;
+                return this;
+            }
+
+            public Request send(String body) {
+                this.body = body != null ? body.getBytes() : null;
+                return this;
+            }
+
+        }
+
+        public static abstract class Callback {
+            public abstract void onComplete(Request req, Response rsp, Exception e);
+        }
+
+        /*---------------------------          ----------------------*/
+        /*                              HTTP                         */
+        /*---------------------------          ----------------------*/
+
+        private static final int CONNECTION_TIMEOUT = 10000;
+        private static final int SOCKET_TIMEOUT = CONNECTION_TIMEOUT;
+        private static final String TAG = Tools.class.getSimpleName();
+
+        static SSLSocketFactory sslFactory;
+
+        static {
+            try {
+                SSLContext sslContext = SSLContext.getInstance(InternalSocketFactory.TLS_PROTOCOL);
+                sslContext.init(null, new TrustManager[]{getX509TrustManager()}, new SecureRandom());
+                sslFactory = new InternalSocketFactory(sslContext);
+            } catch (Exception e) {
+                Log.e(TAG, "<> failed to create SSLSocketFactory", e);
+            }
+        }
+
         public static final String HTTP_GET = "GET";
         public static final String HTTP_POST = "POST";
+        public static final String HTTP_PUT = "PUT";
+
+        public static String httpString(String url, String method, String body, String... headers) throws IOException {
+            return Dt.toString(http(url, method, headers, body != null ? body.getBytes() : null).bodyInputStream());
+        }
+
+        public static Response httpGet(String url, String body, String... headers) {
+            return http(url, HTTP_GET, body, headers);
+        }
+
+        public static Response httpPost(String url, String body, String... headers) {
+            return http(url, HTTP_POST, body, headers);
+        }
+
+        /**
+         * @param url    - just an URL
+         * @param method - "POST" or "GET" or {@link #HTTP_GET} or {@link #HTTP_POST}
+         * @param body   - may be null. will be used for POST requests
+         * @return input stream with results. Use {@link #toString(InputStream)} to extract basic String result from there
+         */
+        public static Response http(String url, String method, String body, String... headers) {
+            return http(url, method, headers, body != null ? body.getBytes() : null);
+        }
+
+        /**
+         * <pre>
+         * Tomcat testing statusCode:
+         *                | body       | status message        | error stream
+         * - 0   - 99   -> Timeout,     no status message,      no error stream,
+         * - 100        -> exception on responseCode
+         * - 101 - 199  -> Timeout,     some (100-102)/null,    no error stream,
+         * - 200 - 299  -> Body,        some (200-208)/null     no error stream
+         * - 205        -> Timeout,     Reset Content,          no error stream
+         * - 300 - 399  -> Body,        some (300-309)/null     no error stream
+         * - 400 - 499  -> Exception,   some(400-417)/null      Body
+         * - 500 - 599  -> Exception,   some(500-511)/null      Body
+         * - 600 - 999  -> Exception,   null                    Body
+         * </pre>
+         * @return response - response with memory-based storage
+         * <p>http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
+         */
+        public static Response http(String url, String method, String[] headers, byte[] body) {
+            boolean debug = false;
+            if (debug) Log.i(TAG, "http() " + method + " " + url + " " + (body != null ? body.length + " bytes: " + Dt.encode64(body) : ""));
+            checkHeaders(headers);
+            URL urlToOpen;
+            try {urlToOpen = new URL(url);} catch (MalformedURLException e) {throw new IllegalArgumentException("url is malformed. url: " + url, e);}
+            long startedAt = System.currentTimeMillis();
+            Response rsp = new Response();
+            rsp.url = url;
+
+            // open connection
+            HttpURLConnection httpConn = null;
+            try {
+                httpConn = (HttpURLConnection)  urlToOpen.openConnection();
+                if (url.startsWith("https:")) {
+                    ((HttpsURLConnection) httpConn).setSSLSocketFactory(sslFactory);
+                }
+                httpConn.setConnectTimeout(CONNECTION_TIMEOUT);
+                httpConn.setReadTimeout(SOCKET_TIMEOUT);
+                httpConn.setDoInput(true);
+                httpConn.setRequestProperty("Content-Type", "application/octet-stream");
+                httpConn.setRequestProperty("Accept",       "application/octet-stream");
+                httpConn.setInstanceFollowRedirects(false);
+            } catch (Exception e) {
+                rsp.exception = e;
+                return rsp;
+            }
+
+            // send request
+            try {
+                httpConn.setRequestMethod(method);
+                if (headers != null) {
+                    for (int i = 0; i < headers.length; i += 2) {
+                        String key = headers[i];
+                        String value = headers[i + 1];
+                        httpConn.setRequestProperty(key, value);
+                    }
+                }
+
+                if (body != null) {
+                    if (!HTTP_POST.equals(method) && !HTTP_PUT.equals(method)) {
+                        Log.e(TAG, "http() body cannot be send using " + method);
+                    } else {
+                        httpConn.setDoOutput(true);
+                        OutputStream os = httpConn.getOutputStream();
+                        os.write(body);
+                        os.close();
+                    }
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "http() failed to send request", e);
+                rsp.exception = new IOException("Failed to send request [" + e.getMessage() + "]", e) ;
+                return rsp;
+            }
+
+            // check results
+            try {
+
+                int responseCode = httpConn.getResponseCode();
+
+                rsp.headers = new HashMap<String, String>();
+                Map<String, List<String>> connHeaders = httpConn.getHeaderFields();
+                for (String key : connHeaders.keySet()) {
+                    rsp.headers.put(key, httpConn.getHeaderField(key));
+                }
+                rsp.code = responseCode;
+                rsp.statusMsg = httpConn.getResponseMessage();
+                if (debug) Log.d(TAG, "http() code: " + rsp.code + ", message: " + rsp.statusMsg);
+
+                // code > 399 -> .getInputStream() throws IOException "Server returned code 400+"
+                //                Go to getErrorStream() instead
+                // code < 100 -> TimeoutException will be thrown on reading
+                if (responseCode >= 200 && responseCode < 400) {
+                    InputStream is = httpConn.getInputStream();
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream(is.available());
+                    streamCopy(is, baos);
+                    byte[] bytes = baos.toByteArray();
+                    if (debug) Log.i(TAG, "http() " + String.format("%5d", bytes.length) + " bytes received:\n" + Dt.encode64(bytes));
+                    rsp.bodyBytes = bytes;
+                    is.close();
+                } else if (responseCode >= 400) {
+                    InputStream es = httpConn.getErrorStream();
+                    if (es != null) {
+                        String errorDetails = es != null ? Dt.toString(es) : null;
+                        if (debug) Log.d(TAG, "http() code: " + responseCode + ", message: " + httpConn.getResponseMessage() + ", e_stream: " + errorDetails + " url: [" + url + "]");
+                        rsp.bodyBytes = errorDetails.getBytes();
+                        es.close();
+                    }
+                } /* else code 0 - 199 ignore */
+
+            } catch (IOException ex) {
+                InputStream es = httpConn.getErrorStream();
+                String errorDetails = es != null ? Dt.toString(es) : "<no error stream>";
+                Log.e(TAG, "http() failed to get response. code: " + rsp.code + " e_stream: " + errorDetails + " url: [" + url + "]", ex);
+                rsp.exception = new IOException("Failed to get response [" + ex.getMessage() + "]", ex);
+                //if (errorDetails != null) rsp.bodyBytes = errorDetails.getBytes();
+                try {es.close();}catch(Exception ignored) {};
+            } finally {
+                long duration = System.currentTimeMillis() - startedAt;
+                rsp.duration = duration;
+                if (debug) Log.i(TAG, "http() finished in " + duration + "ms" + ", url: [" + url + "]" );
+            }
+            return rsp;
+        }
+
+        private static void checkHeaders(String[] headers) {
+            if (headers != null && headers.length % 2 != 0) throw new IllegalArgumentException("headers should have valid key-value pairs. length: " + headers.length);
+        }
+
+        /** Convinient class for HTTP responses */
+        public static class Response {
+            private String url;
+            private long duration;
+            private Exception exception;
+            private int code = -1;
+            private String statusMsg;
+            private Map<String, String> headers;
+            private byte[] bodyBytes;
+
+            public int code() {
+                return code;
+            }
+            public String statusMessage() {
+                return getStatusMessage();
+            }
+            private String getStatusMessage() {
+                return statusMsg;
+            }
+            public String header(String name) {
+                return headers == null ? null : headers.get(name);
+            }
+            public String getHeader(String name) {
+                return header(name);
+            }
+            public boolean isSuccessful() {
+                return exception == null && (code >= 200 && code < 300);
+            }
+            public Exception getException() {
+                return exception;
+            }
+            public boolean isError() {
+                return !isSuccessful();
+            }
+            public InputStream bodyInputStream() {
+                if (bodyBytes == null) return null;
+                return new ByteArrayInputStream(bodyBytes);
+            }
+            public InputStream getBodyInputStream() {
+                return bodyInputStream();
+            }
+            public String bodyString() {
+                if (bodyBytes == null) return null;
+                return new String(bodyBytes);
+            }
+            public String getBodyString() {
+                return bodyString();
+            }
+            public String url() {
+                return url;
+            }
+            public String toString() {
+                String body = null;
+                if (bodyBytes != null && bodyBytes.length > 0) {
+                    body = bodyBytes.length < 4096 ? new String(bodyBytes) : new String(bodyBytes, 0, 4096);
+                }
+                return ""
+                    + "code: " + code
+                    + ", status:  " + statusMsg
+                    + "\n" + url + ", took " + duration + "ms"
+                    + (exception != null ? "\ne: " + exception + ", ": "")
+                    + ", headers: " + Dt.toString(headers, "\n", "\n")
+                    + "\n" + (body == null ? "<no body>" : body)
+                    ;
+            }
+
+        }
+
+        private static X509TrustManager getX509TrustManager() {
+            return new X509TrustManager() {
+                public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {}
+                public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {}
+                public X509Certificate[] getAcceptedIssuers() {return null;}
+            };
+        }
+
+        public static class InternalSocketFactory extends SSLSocketFactory {
+            private final static String TLS_PROTOCOL = "TLS";
+            private final static String TLSV2_PROTOCOL = "TLSv1.2";
+
+            SSLContext sslContext = SSLContext.getInstance(TLS_PROTOCOL);
+
+            public InternalSocketFactory(SSLContext context) throws NoSuchAlgorithmException {
+                this.sslContext = context;
+            }
+
+            @Override
+            public Socket createSocket() throws IOException {
+                return sslContext.getSocketFactory().createSocket();
+            }
+
+            @Override
+            public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException {
+                SSLSocket s = (SSLSocket) sslContext.getSocketFactory().createSocket(socket, host, port, autoClose);
+                s.setEnabledProtocols(new String[] { TLSV2_PROTOCOL });
+                return s;
+            }
+
+            @Override
+            public Socket createSocket(String host, int port) throws IOException {
+                return sslContext.getSocketFactory().createSocket();
+            }
+
+            @Override
+            public Socket createSocket(InetAddress host, int port) throws IOException {
+                return sslContext.getSocketFactory().createSocket();
+            }
+
+            @Override
+            public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
+                return sslContext.getSocketFactory().createSocket();
+            }
+
+            @Override
+            public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
+                return sslContext.getSocketFactory().createSocket();
+            }
+
+            @Override
+            public String[] getDefaultCipherSuites() {
+                return new String[0];
+            }
+
+            @Override
+            public String[] getSupportedCipherSuites() {
+                return new String[0];
+            }
+        }
 
         public static boolean downloadHttpToFile(String url, File file, SSLSocketFactory sslFactory) {
             return downloadHttpToFile(url, file, HTTP_GET, null, sslFactory);
