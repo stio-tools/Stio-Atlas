@@ -108,8 +108,12 @@ public class ScreenBlank extends Activity {
         Object controller = entry.controller;
 
         if (entry.controller2 != null) {
+            if (entry.controller2 instanceof Controller2Impl) {
+                ((Controller2Impl)entry.controller2).activity = this;
+            }
             this.controllerImpl = entry.controller2;
             this.controllerImpl.onCreate(this, savedInstanceState);
+
         } else {    /** Controller or Fragment*/
 
             setContentView(R.layout.screen_blank);
@@ -178,7 +182,7 @@ public class ScreenBlank extends Activity {
         finished = true;
         super.finish();
         if (controllerImpl != null) {
-            controllerImpl.finish(this);
+            controllerImpl.onFinish(this);
         } else {
             if (animate) overridePendingTransition(0, 0);
         }
@@ -231,11 +235,21 @@ public class ScreenBlank extends Activity {
         public void onStop(ScreenBlank blankActivity);
         public void onBackPressed(ScreenBlank blankActivity);
         public void onDestroy(ScreenBlank blankActivity);
-        public void finish(ScreenBlank blankActivity);
+        public void onFinish(ScreenBlank blankActivity);
     }
 
     /** supports more stuff related to {@link Activity} */
     public abstract static class Controller2Impl implements Controller2 {
+
+        private ScreenBlank activity;
+
+        public void finish(){
+            activity.finish();
+        }
+        public ScreenBlank getActivity() {
+            return activity;
+        }
+
         public abstract void onCreate(ScreenBlank blankActivity, Bundle savedInstanceState);
         public void onStart(ScreenBlank blankActivity) {}
         public void onResume(ScreenBlank blankActivity) {}
@@ -243,7 +257,7 @@ public class ScreenBlank extends Activity {
         public void onStop(ScreenBlank blankActivity) {}
         public void onBackPressed(ScreenBlank blankActivity) {blankActivity.finish();}
         public void onDestroy(ScreenBlank blankActivity) {}
-        public void finish(ScreenBlank blankActivity) {}
+        public void onFinish(ScreenBlank blankActivity) {}
     }
 
 }
