@@ -465,6 +465,10 @@ public class Atlas {
         private static final Handler uiHandler = new Handler(Looper.getMainLooper());
         private static final ExecutorService httpExecutor = Executors.newCachedThreadPool();
 
+        public static Response http(Request req) {
+            return http(req.url, req.httpMethod, req.headers, req.body);
+        }
+
         public static void http(Request req, Callback callback) {
             req.callback = callback;
             httpExecutor.execute(req);
@@ -522,12 +526,12 @@ public class Atlas {
                 return this;
             }
 
-            public Request send(byte[] body) {
+            public Request body(byte[] body) {
                 this.body = body;
                 return this;
             }
 
-            public Request send(String body) {
+            public Request body(String body) {
                 this.body = body != null ? body.getBytes() : null;
                 return this;
             }
