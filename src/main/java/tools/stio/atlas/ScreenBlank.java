@@ -17,6 +17,7 @@ package tools.stio.atlas;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -213,6 +214,13 @@ public class ScreenBlank extends Activity {
         super.onResume();
     }
 
+    public void onConfigurationChanged(Configuration newConfig) {
+        if (controllerImpl != null) {
+            controllerImpl.onConfigurationChanged(this, newConfig);
+        }
+        super.onConfigurationChanged(newConfig);
+    }
+
     protected void onPause() {
         if (controllerImpl != null) {
             controllerImpl.onPause(this);
@@ -231,6 +239,7 @@ public class ScreenBlank extends Activity {
         public void onCreate(ScreenBlank blankActivity, Bundle savedInstanceState);
         public void onStart(ScreenBlank blankActivity);
         public void onResume(ScreenBlank blankActivity);
+        public void onConfigurationChanged(ScreenBlank blankActivity, Configuration newConfig);
         public void onPause(ScreenBlank blankActivity);
         public void onStop(ScreenBlank blankActivity);
         public void onBackPressed(ScreenBlank blankActivity);
@@ -253,6 +262,7 @@ public class ScreenBlank extends Activity {
         public abstract void onCreate(ScreenBlank blankActivity, Bundle savedInstanceState);
         public void onStart(ScreenBlank blankActivity) {}
         public void onResume(ScreenBlank blankActivity) {}
+        public void onConfigurationChanged(ScreenBlank blankActivity, Configuration newConfig) {}
         public void onPause(ScreenBlank blankActivity) {}
         public void onStop(ScreenBlank blankActivity) {}
         public void onBackPressed(ScreenBlank blankActivity) {blankActivity.finish();}
