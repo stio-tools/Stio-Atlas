@@ -570,8 +570,8 @@ public class Atlas {
             return Dt.toString(http(url, method, headers, body != null ? body.getBytes() : null).bodyInputStream());
         }
 
-        public static Response httpGet(String url, String body, String... headers) {
-            return http(url, HTTP_GET, body, headers);
+        public static Response httpGet(String url, String... headers) {
+            return http(url, HTTP_GET, null, headers);
         }
 
         public static Response httpPost(String url, String body, String... headers) {

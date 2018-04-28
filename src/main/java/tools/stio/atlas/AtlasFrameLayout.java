@@ -27,6 +27,7 @@ import android.graphics.PorterDuff.Mode;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -78,6 +79,18 @@ public class AtlasFrameLayout extends FrameLayout {
     public AtlasFrameLayout(Context context) {
         super(context);
         if (debug) Log.w(TAG, "AtlasFrameLayout() no attrs");
+        prepareRendering();
+    }
+
+    public AtlasFrameLayout(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        if (debug) Log.w(TAG, "AtlasFrameLayout() attrs: " + attrs);
+        prepareRendering();
+    }
+
+    public AtlasFrameLayout(Context context, AttributeSet attrs, int defStyle) {
+        super(context, attrs, defStyle);
+        if (debug) Log.w(TAG, "AtlasFrameLayout() attrs: " + attrs + ", style: " + defStyle);
         prepareRendering();
     }
 
