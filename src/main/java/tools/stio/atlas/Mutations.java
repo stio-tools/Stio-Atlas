@@ -397,7 +397,7 @@ public class Mutations {
         }
 
         public Mutations.Mutation into(View container) {
-            if (!(container instanceof ViewGroup)) throw new IllegalArgumentException("requires ViewGroup");
+            if (!(container instanceof ViewGroup)) throw new IllegalArgumentException("required ViewGroup is null");
             this.container = (ViewGroup) container;
             return this;
         }
@@ -422,22 +422,22 @@ public class Mutations {
         }
 
         /**
-         * @param animId - how to animate entering
-         * @param animHideId - how to animate underlying view
+         * @param newViewEnterAnimId - how to animate entering
+         * @param oldViewHideAnimId - how to animate underlying view
          */
-        public Mutations.Mutation animateEnter(int animId, int animHideId) {
-            this.animEnterId = animId;
-            this.animHideId = animHideId;
+        public Mutations.Mutation animateEnter(int newViewEnterAnimId, int oldViewHideAnimId) {
+            this.animEnterId = newViewEnterAnimId;
+            this.animHideId = oldViewHideAnimId;
             return this;
         }
 
         /**
-         * @param animId - how to animate exiting
-         * @param animReturnId - how to animate underlying view
+         * @param newViewExitAnimId - how to animate exiting
+         * @param oldViewReturnAnimId - how to animate underlying view
          */
-        public Mutations.Mutation animateExit(int animId, int animReturnId) {
-            this.animExitId = animId;
-            this.animReturnId = animReturnId;
+        public Mutations.Mutation animateExit(int newViewExitAnimId, int oldViewReturnAnimId) {
+            this.animExitId = newViewExitAnimId;
+            this.animReturnId = oldViewReturnAnimId;
             return this;
         }
 
