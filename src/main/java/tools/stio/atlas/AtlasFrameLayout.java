@@ -146,6 +146,7 @@ public class AtlasFrameLayout extends FrameLayout {
         if (surfaceBitmap == null || surfaceBitmap.getWidth() != width || surfaceBitmap.getHeight() != height
                 || refreshShape) {
             
+            if (debug) Log.w(TAG, "checkMasks() " + width + " | " + height );
             surfaceBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             surfaceCanvas = new Canvas(surfaceBitmap);
             
@@ -215,7 +216,8 @@ public class AtlasFrameLayout extends FrameLayout {
         super.onSizeChanged(w, h, oldw, oldh);
         refreshShape = true;
     }
-    
+    /** debug purposes */
+    private int measureCount = 0;
     /**
      * Android's [match_parent;match_parent] behaves weird - it will finally set your's view size to [parent_width, 0].<br>
      * Non-zero results comes from minWidth/minHeight and background's padding, but not from parent. 
@@ -247,37 +249,33 @@ public class AtlasFrameLayout extends FrameLayout {
      * Duplicate issue: <a href="https://code.google.com/p/android/issues/detail?id=136131">https://code.google.com/p/android/issues/detail?id=136131</a> 
      */
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int measureCount = this.measureCount++;
+
         int mWidthBefore  = getMeasuredWidth();
         int mHeightBefore = getMeasuredHeight();
-        if (debug) Log.w(TAG, "onMeasure() before: " + mWidthBefore + "x" + mHeightBefore
+        if (debug) Log.w(TAG, "onMeasure()." + measureCount + " before: " + mWidthBefore + "x" + mHeightBefore
                 + ", spec: " + Atlas.Tools.toStringSpec(widthMeasureSpec, heightMeasureSpec));
-        
+
         //super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        superMeasure(widthMeasureSpec, heightMeasureSpec);
+        superOnMeasure(widthMeasureSpec, heightMeasureSpec);
         
-        int mWidthAfter  = getMeasuredWidth();
-        int mHeightAfter = getMeasuredHeight();
-        int maxChildWidth = 0;
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            if (child.getMeasuredWidth() > maxChildWidth) {
-                if (debug) Log.w(TAG, "onMeasure() child: " + i + ", width: " + child.getMeasuredWidth() + " > maxWidth: " + maxChildWidth + ", visibility: " + child.getVisibility() + ", " + child);
-                maxChildWidth = child.getMeasuredWidth();
-            }
-        }
-        
+        // handling width / height ratio
+        int measuredWidth  = getMeasuredWidth();
+        int measuredHeight = getMeasuredHeight();
+
         if (widthToHeightRatio != 0.0f) {
-            int newHeight = (int) (mWidthAfter * widthToHeightRatio);
-            if (debug) Log.w(TAG, "onMeasure() ratio: " + widthToHeightRatio + ", width: " + mWidthAfter + ", height: " + mHeightAfter + " -> " + newHeight);
-            setMeasuredDimension(mWidthAfter, newHeight);
+            int newHeight = (int) (measuredWidth / widthToHeightRatio);
+            int newWidthSpec  = MeasureSpec.makeMeasureSpec(measuredWidth,  MeasureSpec.EXACTLY);
+            int newHeightSpec = MeasureSpec.makeMeasureSpec(newHeight,      MeasureSpec.EXACTLY);
+            if (debug) Log.w(TAG, "onMeasure()." + measureCount + " ratio: " + widthToHeightRatio + ", width: " + measuredWidth + ", height: " + measuredHeight + " -> " + Atlas.Tools.toStringSpec(newWidthSpec, newHeightSpec));
+            superOnMeasure(newWidthSpec, newHeightSpec);
         }
-        
-        if (debug) Log.w(TAG, "onMeasure() after: " + mWidthAfter + "x" + mHeightAfter);
+
     }
     
     private final ArrayList<View> mMatchParentChildren = new ArrayList<View>(1);
     
-    private void superMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+    private void superOnMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int count = getChildCount();
 
         final boolean measureMatchParentChildren =
