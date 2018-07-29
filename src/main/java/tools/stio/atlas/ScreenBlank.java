@@ -26,6 +26,7 @@ import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 
 import java.util.HashMap;
+import java.util.List;
 
 import tools.stio.atlas.Atlas.Controller;
 import tools.stio.atlas.Dt.Log;
@@ -55,6 +56,7 @@ public class ScreenBlank extends Activity {
 
     private static final HashMap<String, ActivityEntry> activityData = new HashMap<String, ActivityEntry>();
     private static int activityId = 0;
+    private static Class activityClass;
 
     /** @param controller - Fragment or {@link Controller}*/
     public static void open(Object controller, final Activity activity) {
@@ -68,12 +70,13 @@ public class ScreenBlank extends Activity {
      */
     public static void open(Object controller, Controller2 controller2, Object data, final Activity activity) {
         if (controller2 == null && !(controller instanceof Controller) && !(controller instanceof Controller2)) {
-            throw new IllegalArgumentException("Only Controller is supported as first argument");
+            throw new IllegalArgumentException("Only Controller is supported as first argument. Controller: " + controller + ", controller2: " + controller2);
         }
 
-        final Intent imgIntent = new Intent(activity, ScreenBlank.class);
+        Class<ScreenBlank> screenBlankClass = activityClass == null ? ScreenBlank.class : activityClass;
+        final Intent imgIntent = new Intent(activity, screenBlankClass);
         int id = activityId++;
-        String key = "" + ScreenBlank.class + "." + id;
+        String key = "" + screenBlankClass + "." + id;
         imgIntent.putExtra(ACTIVITY_KEY, key);
 
         ActivityEntry entry = new ActivityEntry();
@@ -88,6 +91,9 @@ public class ScreenBlank extends Activity {
                 if (animate) activity.overridePendingTransition(0, 0);
             }
         });
+    }
+    public static void setActivityClass(Class activityClass) {
+        ScreenBlank.activityClass = activityClass;
     }
 
     private String getDataKey() {
