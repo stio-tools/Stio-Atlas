@@ -39,11 +39,6 @@ import android.view.animation.Animation;
 import android.view.animation.Animation.AnimationListener;
 import android.widget.ImageView;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -143,12 +138,14 @@ public class Atlas {
     }
 
     public static AtlasDrawable imageFromUrl(String url) {
+        if (url == null) throw new IllegalArgumentException("url cannot be null");
         AtlasDrawable result = new AtlasDrawable(url);
         downloadQueue.schedule(url, null, result);
         return result;
     }
 
     public static AtlasDrawable imageFromUrlOrFile(String url, File imageFile) {
+        if (url == null) throw new IllegalArgumentException("url cannot be null");
         AtlasDrawable result;
         if (imageFile != null && imageFile.exists() && !imageFile.isDirectory()) {
             result = new AtlasDrawable(url, imageFile);
@@ -403,6 +400,9 @@ public class Atlas {
             return (float) (px * ratio);
         }
 
+        public static boolean isMainThread() {
+            return Looper.myLooper() == Looper.getMainLooper();
+        }
 
         public static View findChildById(ViewGroup group, int id) {
             for (int i = 0; i < group.getChildCount(); i++) {
@@ -534,6 +534,10 @@ public class Atlas {
             public Request body(String body) {
                 this.body = body != null ? body.getBytes() : null;
                 return this;
+            }
+
+            public String toString() {
+                return httpMethod + " " + url + " " + Dt.toString(headers);
             }
 
         }
@@ -946,58 +950,6 @@ public class Atlas {
 
             }
             return httpConn;
-
-        }
-
-        /** @deprecated use {@link #downloadHttpToFile(String, File, String, byte[], SSLSocketFactory)}*/
-        public static boolean downloadHttpToFile(String url, File file) {
-            if (url == null) Log.e(TAG, "downloadHttpToFile() url is null, file: " + file);
-            HttpGet get = new HttpGet(url);
-            HttpResponse response;
-            try {
-                DefaultHttpClient httpClient = new DefaultHttpClient();
-                response = httpClient.execute(get);
-                if (HttpStatus.SC_OK != response.getStatusLine().getStatusCode()) {
-                    Log.e(TAG, "Expected status 200, but got " + response.getStatusLine().getStatusCode() + ", url: [" + url + "]");
-                    return false;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "downloadToFile() cannot execute http request, url: [" + url + "]", e);
-                return false;
-            }
-
-            File dir = file.getParentFile();
-            if (!dir.exists() && !dir.mkdirs()) {
-                Log.e(TAG, "Could not create folders, url: [" + url + "] dir: " + dir.getAbsolutePath());
-                return false;
-            }
-
-            File tempFile = new File(file.getAbsolutePath() + ".download");
-
-            try {
-                streamCopyAndClose(response.getEntity().getContent(), new FileOutputStream(tempFile, false));
-                response.getEntity().consumeContent();
-            } catch (IOException e) {
-                if (debug) Log.e(TAG, "downloadToFile() cannot extract content from http response for [" + url + "]", e);
-            }
-
-            if (tempFile.length() != response.getEntity().getContentLength()) {
-                tempFile.delete();
-                Log.e(TAG, "downloadToFile() File size mismatch for [" + url + "] "
-                         + " expected: " + response.getEntity().getContentLength()
-                         + " actual: " + tempFile.length()
-                         + " path: " + tempFile.getAbsolutePath());
-                return false;
-            }
-
-            // last step
-            if (tempFile.renameTo(file)) {
-                if (debug) Log.w(TAG, "downloadToFile() Successfully downloaded file: " + file.getAbsolutePath());
-                return true;
-            } else {
-                Log.e(TAG, "downloadToFile() Could not rename temp file: " + tempFile.getAbsolutePath() + " to: " + file.getAbsolutePath());
-                return false;
-            }
 
         }
 
