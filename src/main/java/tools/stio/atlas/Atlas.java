@@ -16,6 +16,7 @@
 package tools.stio.atlas;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -1745,7 +1746,9 @@ public class Atlas {
     }
 
     public static class FileStreamProvider extends ImageLoader.InputStreamProvider {
+
         final File file;
+
         public FileStreamProvider(File file) {
             if (file == null) throw new IllegalStateException("File cannot be null");
             if (!file.exists()) throw new IllegalStateException("File must exist!");
@@ -1768,6 +1771,32 @@ public class Atlas {
         }
         public int hashCode() {
             return file.hashCode();
+        }
+    }
+
+    public static class AssetStreamProvider extends ImageLoader.InputStreamProvider {
+
+        private String filePathInAsset;
+        private AssetManager assets;
+
+        public AssetStreamProvider(String filePathInAsset, AssetManager assets) {
+            if (filePathInAsset == null) throw new IllegalArgumentException("filePath must be specified");
+            if (assets == null) throw new IllegalArgumentException("asset (AssetManager) is required, given: " + assets);
+            this.filePathInAsset = filePathInAsset;
+            this.assets = assets;
+        }
+
+        public InputStream getInputStream() {
+            try {
+                return assets.open(filePathInAsset);
+            } catch (IOException e) {
+                Log.e(ImageLoader.TAG, "AssetStreamProvider.getInputStream() cannot open file. file: " + filePathInAsset, e);
+                return null;
+            }
+        }
+
+        public boolean ready() {
+            return true;
         }
     }
 

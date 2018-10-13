@@ -34,6 +34,7 @@ import java.util.TreeMap;
 import tools.stio.atlas.Atlas.DownloadQueue;
 import tools.stio.atlas.Atlas.FileStreamProvider;
 import tools.stio.atlas.Atlas.ImageLoader;
+import tools.stio.atlas.Atlas.ImageLoader.InputStreamProvider;
 import tools.stio.atlas.Atlas.Tools;
 import tools.stio.atlas.Dt.Log;
 
@@ -106,7 +107,7 @@ public class AtlasDrawable extends android.graphics.drawable.Drawable implements
     private int defaultHeight   = 1;
 
     File from;
-    FileStreamProvider fileStreamProvider;
+    InputStreamProvider inputStreamProvider;
     ImageLoader.ImageSpec spec;
     Paint workPaint = new Paint();
     long inflatedAt = 0;
@@ -137,6 +138,13 @@ public class AtlasDrawable extends android.graphics.drawable.Drawable implements
         if (debug) Log.w(TAG, "AtlasDrawable() " + autoId + ": " + imageId);
     }
 
+    public AtlasDrawable(String imageId, InputStreamProvider inputStreamProvider) {
+        if (imageId == null) throw new IllegalArgumentException("AtlasDrawable .id cannot be null");
+        this.id = imageId;
+        this.inputStreamProvider = inputStreamProvider;
+        if (debug) Log.w(TAG, "AtlasDrawable() " + autoId + ": " + imageId + ", provider: " + inputStreamProvider);
+    }
+
     /**
      * Creates {@link AtlasDrawable} from local file
      *
@@ -148,7 +156,7 @@ public class AtlasDrawable extends android.graphics.drawable.Drawable implements
         if (from.exists() && from.isDirectory()) throw new IllegalArgumentException("Specified file is a directory and cannot be used [" + from.getAbsolutePath()+ "]");
 
         this.from = from;
-        this.fileStreamProvider = new FileStreamProvider(from);
+        this.inputStreamProvider = new FileStreamProvider(from);
     }
 
     public AtlasDrawable defaultSize(int width, int height) {
@@ -173,7 +181,7 @@ public class AtlasDrawable extends android.graphics.drawable.Drawable implements
     public void onDownloadComplete(String url, File file) {
         if (debug) Log.w(TAG, "onDownloadComplete() id: " + id + ", file: " + file);
         this.from = file;
-        this.fileStreamProvider = new FileStreamProvider(from);
+        this.inputStreamProvider = new FileStreamProvider(from);
         if (inflateImmediately) {
             requestInflate();
         }
@@ -350,7 +358,7 @@ public class AtlasDrawable extends android.graphics.drawable.Drawable implements
         if (debugDraw) {
             if (bmp != null) {
                 Tools.drawRect(getBounds().left, getBounds().top, 10, 10, debugPaintCmplt, debugPaintStroke, canvas);
-            } else if (fileStreamProvider == null) {
+            } else if (inputStreamProvider == null) {
                 Tools.drawRect(getBounds().left, getBounds().top, 10, 10, debugPaintDwnld, debugPaintStroke, canvas);
             } else {
                 Tools.drawRect(getBounds().left, getBounds().top, 10, 10, debugPaintInflt, debugPaintStroke, canvas);
@@ -369,17 +377,17 @@ public class AtlasDrawable extends android.graphics.drawable.Drawable implements
         // if already scheduled - don't schedule again.
         // XXX: if two drawables schedule same image, one of them wouldn't be notified
 
-        if (fileStreamProvider != null) {
+        if (inputStreamProvider != null) {
             int requiredWidth = getBounds().width();
             int requiredHeight = getBounds().height();
 
             if (requiredWidth == defaultWidth || requiredHeight == defaultHeight)  {
                 if (debug) Log.w(TAG, "requestInflate() small boundaries: " + requiredWidth + "x" + requiredHeight + ", \t id: " + id + ", spec: " + spec);
-                Atlas.imageLoader.requestImage(id, fileStreamProvider, this, true);
+                Atlas.imageLoader.requestImage(id, inputStreamProvider, this, true);
             } else {
                 if (debug) Log.w(TAG, "requestInflate()       boundaries: " + requiredWidth + "x" + requiredHeight + ", \t id: " + id);
                 boolean decodeOnly = requiredWidth == 0 && requiredHeight == 0;
-                Atlas.imageLoader.requestImage(id, fileStreamProvider, requiredWidth, requiredHeight, false, this, decodeOnly);
+                Atlas.imageLoader.requestImage(id, inputStreamProvider, requiredWidth, requiredHeight, false, this, decodeOnly);
             }
         }
     }

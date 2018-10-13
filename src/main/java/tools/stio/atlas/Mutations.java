@@ -145,6 +145,10 @@ public class Mutations {
         listeners.add(listener);
     }
 
+    public Activity getActivity() {
+        return activity;
+    }
+
     public static class MutationListener {
         /**
          * @param workView  - fragment root view
@@ -419,6 +423,10 @@ public class Mutations {
 
         public Object getId() {
             return id;
+        }
+
+        public ViewGroup getContainer() {
+            return container;
         }
 
         /**
