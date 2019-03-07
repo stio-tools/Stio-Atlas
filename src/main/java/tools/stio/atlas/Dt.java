@@ -18,6 +18,7 @@ package tools.stio.atlas;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -405,6 +406,10 @@ public class Dt {
 
     public static String toString(Map<?, ?> map) {
         return toString(map, ", ", "");
+    }
+
+    public static String toString(Map<?, ?> map, String separator) {
+        return toString(map, separator, "");
     }
 
     public static String toString(Map<?, ?> map, String separator, String firstSeparator) {
@@ -835,44 +840,62 @@ public class Dt {
         public static class LogBackAndroid extends LogBack {
             private static final boolean ENABLED = true;/*BuildConfig.DEBUG*/;
 
+            /**
+             #define LOGGER_ENTRY_MAX_LEN        (4*1024)
+             #define LOGGER_ENTRY_MAX_PAYLOAD (LOGGER_ENTRY_MAX_LEN - sizeof(struct logger_entry))                            int to = from + 2048;
+             */
+            private static void log(int priority, String TAG, String what, Throwable e) {
+                if (e != null) {
+                    what = what + "\n" + android.util.Log.getStackTraceString(e);
+                }
+
+                for (int from = 0; from < what.length(); ) {
+                    int to = from + 3072;
+                    if (to > what.length()) to = what.length();
+                    String sub = what.substring(from, to);
+                    android.util.Log.println(priority, TAG, sub);
+                    from = to;
+                }
+            }
+
             public void v(String tag, String what) {
-                if (ENABLED) android.util.Log.v(tag, what);
+                if (ENABLED) log(android.util.Log.VERBOSE, tag, what, null);
             }
 
             public void v(String tag, String what, Throwable e) {
-                if (ENABLED) android.util.Log.v(tag, what, e);
+                if (ENABLED) log(android.util.Log.VERBOSE, tag, what, e);
             }
 
             public void d(String tag, String what) {
-                if (ENABLED) android.util.Log.d(tag, what);
+                if (ENABLED) log(android.util.Log.DEBUG, tag, what, null);
             }
 
             public void d(String tag, String what, Throwable e) {
-                if (ENABLED) android.util.Log.d(tag, what, e);
+                if (ENABLED) log(android.util.Log.DEBUG, tag, what, e);
             }
 
             public void i(String tag, String what) {
-                if (ENABLED) android.util.Log.i(tag, what);
+                if (ENABLED) log(android.util.Log.INFO, tag, what, null);
             }
             
             public void i(String tag, String what, Throwable e) {
-                if (ENABLED) android.util.Log.i(tag, what, e);
+                if (ENABLED) log(android.util.Log.INFO, tag, what, e);
             }
 
             public void w(String tag, String what) {
-                if (ENABLED) android.util.Log.w(tag, what);
+                if (ENABLED) log(android.util.Log.WARN, tag, what, null);
             }
             
             public void w(String tag, String what, Throwable e) {
-                if (ENABLED) android.util.Log.w(tag, what, e);
+                if (ENABLED) log(android.util.Log.WARN, tag, what, e);
             }
             
             public void e(String tag, String what) {
-                if (ENABLED) android.util.Log.e(tag, what);
+                if (ENABLED) log(android.util.Log.ERROR, tag, what, null);
             }
             
             public void e(String tag, String what, Throwable e) {
-                if (ENABLED) android.util.Log.e(tag, what, e);
+                if (ENABLED) log(android.util.Log.ERROR, tag, what, e);
             }
 
         }
