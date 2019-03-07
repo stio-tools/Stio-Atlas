@@ -65,6 +65,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -437,6 +438,28 @@ public class Atlas {
             return totalBytes;
         }
 
+        public static int streamCopyAndCloseQuietly(InputStream from, OutputStream to) {
+            int result = -1; // exception
+            try {
+                result = streamCopyAndClose(from, to);
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                closeQuietly(from);
+                closeQuietly(to);
+            }
+            return result;
+        }
+
+        public static int streamCopyAndCloseQuietly(InputStream from, File to) {
+            try {
+                return streamCopyAndCloseQuietly(from, new FileOutputStream(to));
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                return -1;
+            }
+        }
+
         /**
          * @return number of copied bytes
          */
@@ -538,9 +561,20 @@ public class Atlas {
             }
 
             public String toString() {
-                return httpMethod + " " + url + " " + Dt.toString(headers);
+                return httpMethod + " " + url + " " + Dt.toString(asMap(headers), "\n","\n")
+                    + "\nbody " + (body == null ? ": null" : (body.length + " bytes: " + new String(body)));
             }
 
+        }
+
+        private static Map asMap(Object... keyValues) {
+            checkHeaders(keyValues);
+            if (keyValues == null || keyValues.length == 0) return Collections.emptyMap();
+            Map result = new LinkedHashMap(keyValues.length / 2, 1.0f);
+            for (int i = 0; i < keyValues.length; i += 2) {
+                result.put(keyValues[i], keyValues[i + 1]);
+            }
+            return result;
         }
 
         public static abstract class Callback {
@@ -715,7 +749,7 @@ public class Atlas {
             return rsp;
         }
 
-        private static void checkHeaders(String[] headers) {
+        private static void checkHeaders(Object[] headers) {
             if (headers != null && headers.length % 2 != 0) throw new IllegalArgumentException("headers should have valid key-value pairs. length: " + headers.length);
         }
 
@@ -771,9 +805,14 @@ public class Atlas {
                 return url;
             }
             public String toString() {
+                return toString(false);
+            }
+            public String toString(boolean truncateBody) {
                 String body = null;
                 if (bodyBytes != null && bodyBytes.length > 0) {
-                    body = bodyBytes.length < 4096 ? new String(bodyBytes) : new String(bodyBytes, 0, 4096);
+                    body = (truncateBody && bodyBytes.length >= 4096)
+                        ? new String(bodyBytes, 0, 4096)
+                        : new String(bodyBytes);
                 }
                 return ""
                     + "code: " + code
