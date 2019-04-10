@@ -34,6 +34,7 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.MeasureSpec;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.animation.Animation;
@@ -460,6 +461,15 @@ public class Atlas {
             }
         }
 
+        public static int streamCopyAndCloseQuietly(File from, File to) {
+            try {
+                return streamCopyAndCloseQuietly(new FileInputStream(from), new FileOutputStream(to));
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                return -1;
+            }
+        }
+
         /**
          * @return number of copied bytes
          */
@@ -474,10 +484,10 @@ public class Atlas {
         }
 
         public static String toStringSpec(int measureSpec) {
-            switch (View.MeasureSpec.getMode(measureSpec)) {
-                case View.MeasureSpec.AT_MOST : return "" + View.MeasureSpec.getSize(measureSpec) + ".A";
-                case View.MeasureSpec.EXACTLY : return "" + View.MeasureSpec.getSize(measureSpec) + ".E";
-                default                  : return "" + View.MeasureSpec.getSize(measureSpec) + ".U";
+            switch (MeasureSpec.getMode(measureSpec)) {
+                case MeasureSpec.AT_MOST : return "" + MeasureSpec.getSize(measureSpec) + ".A";
+                case MeasureSpec.EXACTLY : return "" + MeasureSpec.getSize(measureSpec) + ".E";
+                default                  : return "" + MeasureSpec.getSize(measureSpec) + ".U";
             }
         }
 
@@ -1025,9 +1035,14 @@ public class Atlas {
             drawPlus(rect.left, rect.top, rect.right, rect.bottom, paint, canvas);
         }
 
-        public static void drawPlus(float xCenter, float yCenter, Canvas canvas, Paint paint) {
+        public static void drawPlus(float xCenter, float yCenter, Paint paint, Canvas canvas) {
             canvas.drawLine(xCenter, -10000, xCenter, 10000, paint);
             canvas.drawLine(-10000, yCenter, 10000, yCenter, paint);
+        }
+
+        public static void drawPlus(float xCenter, float yCenter, float radius, Paint paint, Canvas canvas) {
+            canvas.drawLine(xCenter - 0.5f * radius, yCenter, xCenter + 0.5f * radius, yCenter, paint);
+            canvas.drawLine(xCenter, yCenter - 0.5f * radius, xCenter, yCenter + 0.5f * radius, paint);
         }
 
         public static void drawPlusCircle(float xCenter, float yCenter, float radius, Paint paint, Canvas canvas) {
