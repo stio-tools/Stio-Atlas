@@ -454,6 +454,7 @@ public class Atlas {
 
         public static int streamCopyAndCloseQuietly(InputStream from, File to) {
             try {
+                if (!to.exists()) to.getParentFile().mkdirs();
                 return streamCopyAndCloseQuietly(from, new FileOutputStream(to));
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
@@ -463,6 +464,7 @@ public class Atlas {
 
         public static int streamCopyAndCloseQuietly(File from, File to) {
             try {
+                if (!to.exists()) to.getParentFile().mkdirs();
                 return streamCopyAndCloseQuietly(new FileInputStream(from), new FileOutputStream(to));
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
