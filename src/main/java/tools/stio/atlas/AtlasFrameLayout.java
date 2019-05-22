@@ -126,7 +126,7 @@ public class AtlasFrameLayout extends FrameLayout {
             setDrawingCacheEnabled(false);
             if (debug)  Log.d(TAG, "prepareRendering() set software rendering...");
         } else {
-            setLayerType(LAYER_TYPE_SOFTWARE, null);
+            setLayerType(defaultLayerType, null);
             if (debug)  Log.d(TAG, "prepareRendering() set  default rendering...");
         }
     }

@@ -557,7 +557,7 @@ public class Atlas {
             }
 
             public Request headers(String... headers) {
-                checkHeaders(headers);
+                checkPairs(headers);
                 this.headers = headers;
                 return this;
             }
@@ -580,7 +580,7 @@ public class Atlas {
         }
 
         private static Map asMap(Object... keyValues) {
-            checkHeaders(keyValues);
+            checkPairs(keyValues);
             if (keyValues == null || keyValues.length == 0) return Collections.emptyMap();
             Map result = new LinkedHashMap(keyValues.length / 2, 1.0f);
             for (int i = 0; i < keyValues.length; i += 2) {
@@ -659,7 +659,7 @@ public class Atlas {
         public static Response http(String url, String method, String[] headers, byte[] body) {
             boolean debug = false;
             if (debug) Log.i(TAG, "http() " + method + " " + url + " " + (body != null ? body.length + " bytes: " + Dt.encode64(body) : ""));
-            checkHeaders(headers);
+            checkPairs(headers);
             URL urlToOpen;
             try {urlToOpen = new URL(url);} catch (MalformedURLException e) {throw new IllegalArgumentException("url is malformed. url: " + url, e);}
             long startedAt = System.currentTimeMillis();
@@ -761,8 +761,8 @@ public class Atlas {
             return rsp;
         }
 
-        private static void checkHeaders(Object[] headers) {
-            if (headers != null && headers.length % 2 != 0) throw new IllegalArgumentException("headers should have valid key-value pairs. length: " + headers.length);
+        private static void checkPairs(Object[] pairs) {
+            if (pairs != null && pairs.length % 2 != 0) throw new IllegalArgumentException("should have valid key-value pairs. length: " + pairs.length);
         }
 
         /** Convinient class for HTTP responses */
