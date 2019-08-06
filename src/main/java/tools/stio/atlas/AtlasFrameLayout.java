@@ -18,6 +18,7 @@ package tools.stio.atlas;
 import java.util.ArrayList;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -77,20 +78,27 @@ public class AtlasFrameLayout extends FrameLayout {
     }
     
     public AtlasFrameLayout(Context context) {
-        super(context);
-        if (debug) Log.w(TAG, "AtlasFrameLayout() no attrs");
-        prepareRendering();
+        this(context, null);
     }
 
     public AtlasFrameLayout(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        if (debug) Log.w(TAG, "AtlasFrameLayout() attrs: " + attrs);
-        prepareRendering();
+        this(context, attrs, 0);
     }
 
     public AtlasFrameLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         if (debug) Log.w(TAG, "AtlasFrameLayout() attrs: " + attrs + ", style: " + defStyle);
+
+        if (attrs != null) {
+            TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.AtlasFrameLayout);
+            try {
+                maskDrawable = typedArray.getDrawable(R.styleable.AtlasFrameLayout_maskDrawable);
+                widthToHeightRatio = typedArray.getFloat(R.styleable.AtlasFrameLayout_widthToHeightRatio, 0.0f);
+            } finally {
+                typedArray.recycle();
+            }
+        }
+
         prepareRendering();
     }
 
