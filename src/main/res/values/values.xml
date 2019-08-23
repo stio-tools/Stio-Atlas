@@ -4,4 +4,12 @@
         <attr name="maskDrawable" format="reference"/>
         <attr name="widthToHeightRatio" format="float"/>
     </declare-styleable>
+
+    <declare-styleable name="AtlasImageView">
+        <attr name="src" format="reference"/>
+        <attr name="scaleType" format="enum">
+            <enum name="SCALE_FIT" value="0"/>
+            <enum name="SCALE_FILL" value="1"/>
+        </attr>
+    </declare-styleable>
 </resources>
