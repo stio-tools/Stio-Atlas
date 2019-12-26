@@ -100,7 +100,7 @@ public class ScreenBlank extends Activity {
         return getIntent().getStringExtra(ACTIVITY_KEY);
     }
 
-    private static class ActivityEntry {
+    protected static class ActivityEntry {
         Object controller;
         Controller2 controller2;
         Object data;
@@ -111,7 +111,14 @@ public class ScreenBlank extends Activity {
         if (debug) Log.w(TAG, "onCreate() savedInstanceState: " + savedInstanceState);
         super.onCreate(savedInstanceState);
 
-        ActivityEntry entry = activityData.get(getDataKey());
+        String dataKey = getDataKey();
+        ActivityEntry entry = activityData.get(dataKey);
+
+        if (entry == null) {
+            onCreateFailed(dataKey, activityData, savedInstanceState);
+            return;
+        }
+
         Object controller = entry.controller;
 
         if (entry.controller2 != null) {
@@ -145,6 +152,16 @@ public class ScreenBlank extends Activity {
 
         }
 
+    }
+
+    /**
+     * Called when System starts ScreenBlank but associated data is not available.<p>
+     * Usually happens Android System restarts app with ScreenBlank after inactivity or crash<p>
+     *
+     * It is up to subclasses to determine behavior in such case
+     */
+    protected void onCreateFailed(String dataKey, HashMap<String,ActivityEntry> activityData, Bundle savedInstanceState) {
+        throw new IllegalStateException("No associated data for: " + dataKey);
     }
 
     /** @return data object passed to {@link ScreenBlank#open(Object controller, Controller2, Object data, Activity)} */

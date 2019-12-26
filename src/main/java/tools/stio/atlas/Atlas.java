@@ -65,6 +65,7 @@ import java.security.cert.X509Certificate;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
@@ -84,7 +85,9 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import tools.stio.atlas.Atlas.ImageLoader.InputStreamProvider;
 import tools.stio.atlas.Dt.AdapterOnItem;
+import tools.stio.atlas.Dt.Base64;
 import tools.stio.atlas.Dt.Log;
 
 /**
@@ -543,7 +546,7 @@ public class Atlas {
             private String url;
             private String httpMethod;
             private String[] headers;
-            private byte[] body;
+            private InputStream body;
 
             private Response rsp;
             private Callback callback;
@@ -553,7 +556,7 @@ public class Atlas {
                 this.url = url;
                 this.httpMethod = httpMethod;
                 this.headers = headers;
-                this.body = body;
+                this.body = body != null ? new ByteArrayInputStream(body) : null;
             }
 
             public Request headers(String... headers) {
@@ -563,18 +566,30 @@ public class Atlas {
             }
 
             public Request body(byte[] body) {
-                this.body = body;
+                this.body = new ByteArrayInputStream(body);
                 return this;
             }
 
             public Request body(String body) {
-                this.body = body != null ? body.getBytes() : null;
+                this.body = body != null ? new ByteArrayInputStream(body.getBytes()) : null;
+                return this;
+            }
+
+            public Request body(InputStream is) {
+                this.body = is;
                 return this;
             }
 
             public String toString() {
-                return httpMethod + " " + url + " " + Dt.toString(asMap(headers), "\n","\n")
-                    + "\nbody " + (body == null ? ": null" : (body.length + " bytes: " + new String(body)));
+                String strLength;
+                try {
+                    strLength = body != null ? "" + body.available() + " bytes" : null;
+                } catch (Exception e) {
+                    strLength = "exception: " + e;
+                }
+
+                return httpMethod + " " + url + " " + Dt.toString(asMap((Object[]) headers), "\n","\n")
+                    + "\n " + strLength;
             }
 
         }
@@ -656,9 +671,13 @@ public class Atlas {
          * @return response - response with memory-based storage
          * <p>http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
          */
-        public static Response http(String url, String method, String[] headers, byte[] body) {
+        public static Response http(String url, String method, String[] headers, final byte[] body) {
             boolean debug = false;
-            if (debug) Log.i(TAG, "http() " + method + " " + url + " " + (body != null ? body.length + " bytes: " + Dt.encode64(body) : ""));
+            if (debug) Log.i(TAG, "http() " + method + " " + url + " " + (body != null ? body.length + " bytes: " + Dt.encode64(Arrays.copyOf(body, body.length > 2048 ? 2048 : body.length)) : ""));
+            return http(url, method, headers, body != null ? new ByteArrayInputStream(body) : null);
+        }
+
+        public static Response http(String url, String method, String[] headers, InputStream body) {
             checkPairs(headers);
             URL urlToOpen;
             try {urlToOpen = new URL(url);} catch (MalformedURLException e) {throw new IllegalArgumentException("url is malformed. url: " + url, e);}
@@ -700,9 +719,7 @@ public class Atlas {
                         Log.e(TAG, "http() body cannot be send using " + method);
                     } else {
                         httpConn.setDoOutput(true);
-                        OutputStream os = httpConn.getOutputStream();
-                        os.write(body);
-                        os.close();
+                        streamCopyAndClose(body, httpConn.getOutputStream());
                     }
                 }
             } catch (IOException e) {

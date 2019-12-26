@@ -314,6 +314,7 @@ public class Dt {
      * @return the converted string
      */
     public static String toString(Object[] items, String separator, String firstSeparator, boolean printIds) {
+        if (items == null) return null;
         return toString(Arrays.asList(items), separator, firstSeparator, printIds);
     }
 
