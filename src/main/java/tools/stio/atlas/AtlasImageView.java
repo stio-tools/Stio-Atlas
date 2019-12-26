@@ -17,6 +17,7 @@ package tools.stio.atlas;
 
 import android.animation.TimeInterpolator;
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.graphics.Canvas;
@@ -63,28 +64,37 @@ public class AtlasImageView extends View {
     private int contentWorkHeight;
     
     private final Position pos = new Position();
-    
-    // TODO: 
+
+    private SCALE_TYPE scaleType = SCALE_TYPE.SCALE_FIT;
+
+    // TODO:
     // - support contentDimensions: 0x0
-    // - support contentDimensions + MeasureSpec.EXACT sizes 
-    // - support boundaries + drawable instead of contentDimensions + drawable 
-    
+    // - support contentDimensions + MeasureSpec.EXACT sizes
+    // - support boundaries + drawable instead of contentDimensions + drawable
     //----------------------------------------------------------------------------
-    public AtlasImageView(Context context, AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
-        setupPaints();
+
+    public AtlasImageView(Context context) {
+        this(context, null);
     }
 
     public AtlasImageView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        setupPaints();
+        this(context, attrs, 0);
     }
 
-    public AtlasImageView(Context context) {
-        super(context);
+    public AtlasImageView(Context context, AttributeSet attrs, int defStyle) {
+        super(context, attrs, defStyle);
         setupPaints();
+        if (attrs != null) {
+            TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.AtlasImageView);
+            try {
+                scaleType = SCALE_TYPE.values()[typedArray.getInt(R.styleable.AtlasImageView_scaleType, 0)];
+                drawable = typedArray.getDrawable(R.styleable.AtlasImageView_src);
+            } finally {
+                typedArray.recycle();
+            }
+        }
     }
-    
+
     protected void onMeasure(int widthSpec, int heightSpec) {
         int mWidthBefore  = getMeasuredWidth();
         int mHeightBefore = getMeasuredHeight();
@@ -288,7 +298,7 @@ public class AtlasImageView extends View {
             boolean flippedDimensions = flippedDimensions();
             double zoomToFitHor = 1.0 * viewWidth  / (flippedDimensions ? defaultHeight : defaultWidth);
             double zoomToFitVer = 1.0 * viewHeight / (flippedDimensions ? defaultWidth : defaultHeight);
-            double defaultZoom = Math.min(zoomToFitHor, zoomToFitVer);  // both dimensions should fit
+            double defaultZoom = scaleType == SCALE_TYPE.SCALE_FIT ? Math.min(zoomToFitHor, zoomToFitVer) : Math.max(zoomToFitHor, zoomToFitVer);
             
             if (contentWorkWidth == 0) {
                 contentWorkWidth = (int) (defaultWidth * defaultZoom);
@@ -473,7 +483,7 @@ public class AtlasImageView extends View {
     private void checkBoundaries() {
         Position moveTo = pos.copy();
         boolean move = false;
-        float minZoom = getZoomToFit();
+        float minZoom = scaleType == SCALE_TYPE.SCALE_FIT ? getZoomToFit() : getZoomToFill();
         float maxZoom = minZoom * 3;
         if (maxZoom < getZoomToFill()) maxZoom = getZoomToFill();
         
@@ -707,6 +717,12 @@ public class AtlasImageView extends View {
         public abstract boolean handleMove(Position result, long currentTime, long startedAt);
     }
     
+
+    public enum SCALE_TYPE {
+        SCALE_FIT,
+        SCALE_FILL
+    }
+
     public static class Position {
         
         private float zoom = 1.0f;
