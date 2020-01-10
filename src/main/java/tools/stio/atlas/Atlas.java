@@ -85,9 +85,7 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import tools.stio.atlas.Atlas.ImageLoader.InputStreamProvider;
 import tools.stio.atlas.Dt.AdapterOnItem;
-import tools.stio.atlas.Dt.Base64;
 import tools.stio.atlas.Dt.Log;
 
 /**
@@ -95,6 +93,9 @@ import tools.stio.atlas.Dt.Log;
  * @since 12 May 2015
  */
 public class Atlas {
+
+    public static final String TAG = Atlas.class.getSimpleName();
+    public static final boolean debug = false;
 
     public static final String METADATA_KEY_CONVERSATION_TITLE = "conversationName";
     
@@ -109,8 +110,6 @@ public class Atlas {
     public static final String MIME_TYPE_IMAGE_DIMENSIONS = "application/json+imageSize";
 
     public static final Atlas.DownloadQueue downloadQueue = new DownloadQueue(2);
-    public static final String TAG = Atlas.class.getSimpleName();
-    public static final boolean debug = false;
     public static final ImageLoader imageLoader = new ImageLoader();
 
     public static String getInitials(Participant p) {
@@ -304,6 +303,8 @@ public class Atlas {
 
 
     public static final class Tools {
+        private static final String TAG = Tools.class.getSimpleName();
+
         /** Millis in 24 Hours */
         public static final int TIME_HOURS_24 = 24 * 60 * 60 * 1000;
         // TODO: localization required to all time based constants below
@@ -505,7 +506,11 @@ public class Atlas {
         private static final ExecutorService httpExecutor = Executors.newCachedThreadPool();
 
         public static Response http(Request req) {
-            return http(req.url, req.httpMethod, req.headers, req.body);
+            Response rsp = http(req.url, req.httpMethod, req.headers, req.body);
+            if (req.body != null && req.body.markSupported()) try {
+                req.body.reset();
+            } catch (IOException ignored) { }
+            return rsp;
         }
 
         public static void http(Request req, Callback callback) {
@@ -519,7 +524,7 @@ public class Atlas {
             public final void run() {
                 // no response means .run() first time => execute in background
                 if (this.rsp == null) {
-                    this.rsp = http(url, httpMethod, headers, body);
+                    this.rsp = http(this);
                     if (callback != null) {
                         uiHandler.post(this);
                     }
@@ -581,15 +586,22 @@ public class Atlas {
             }
 
             public String toString() {
-                String strLength;
-                try {
-                    strLength = body != null ? "" + body.available() + " bytes" : null;
-                } catch (Exception e) {
-                    strLength = "exception: " + e;
+                String bodyStr = "<no body>";
+                if (body != null) {
+                    try {
+                        if (body.markSupported()) {
+                            bodyStr = Dt.toString(body);
+                            body.reset();
+                        } else {
+                            bodyStr = "" + body.available() + " bytes, " + body.getClass().getSimpleName();
+                        }
+                    } catch (Exception e) {
+                        bodyStr = "exception: " + e;
+                    }
                 }
 
                 return httpMethod + " " + url + " " + Dt.toString(asMap((Object[]) headers), "\n","\n")
-                    + "\n " + strLength;
+                    + "\n" + bodyStr;
             }
 
         }
