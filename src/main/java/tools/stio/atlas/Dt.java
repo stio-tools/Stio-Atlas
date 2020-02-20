@@ -318,6 +318,11 @@ public class Dt {
         return toString(Arrays.asList(items), separator, firstSeparator, printIds);
     }
 
+    public static <T> String toString(T[] items, String separator, String firstSeparator, boolean printIds, Adapter<T> adapter) {
+        if (items == null) return null;
+        return toString(Arrays.asList(items), separator, firstSeparator, printIds, adapter);
+    }
+
     /**
      * Converts a particular collection (for example, {@link java.util.ArrayList etc.}, {@link java.util.HashSet})
      * to the human readable string.
@@ -401,8 +406,8 @@ public class Dt {
         public int items(Object from);
     }
 
-    public interface Adapter {
-        public String toString(Object what);
+    public interface Adapter <T> {
+        public String toString(T what);
     }
 
     public static String toString(Map<?, ?> map) {
@@ -427,7 +432,7 @@ public class Dt {
             sb.append(i == 0 ? firstSeparator : separator).append(i).append(": ");
             sb.append(entry.getKey()).append(" : ").append(entry.getValue());
         }
-        sb.append("]");
+        sb.append(firstSeparator).append("]");
         return sb.toString();
     }
 
@@ -450,6 +455,7 @@ public class Dt {
             sb.append(i == 0 ? firstSeparator : separator).append(i).append(": ");
             sb.append(key).append(" : ").append(bundle.get(key));
         }
+        sb.append(firstSeparator);
         sb.append("]");
         return sb.toString();
     }
