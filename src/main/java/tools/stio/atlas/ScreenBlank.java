@@ -44,7 +44,7 @@ public class ScreenBlank extends Activity {
 
     private static final String ACTIVITY_KEY = "#activityKey";
 
-    private Controller2 controllerImpl;
+    protected Controller2 controllerImpl;
 
     private ViewGroup rootView;
     private View backgroundView;
@@ -224,24 +224,24 @@ public class ScreenBlank extends Activity {
     }
 
     protected void onStart() {
+        super.onStart();
         if (controllerImpl != null) {
             controllerImpl.onStart(this);
         }
-        super.onStart();
     }
 
     protected void onResume() {
+        super.onResume();
         if (controllerImpl != null) {
             controllerImpl.onResume(this);
         }
-        super.onResume();
     }
 
     public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
         if (controllerImpl != null) {
             controllerImpl.onConfigurationChanged(this, newConfig);
         }
-        super.onConfigurationChanged(newConfig);
     }
 
     protected void onPause() {
@@ -258,6 +258,14 @@ public class ScreenBlank extends Activity {
         super.onStop();
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (controllerImpl != null) {
+            controllerImpl.onActivityResult(this, requestCode, resultCode, data);
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
     public interface Controller2 {
         public void onCreate(ScreenBlank blankActivity, Bundle savedInstanceState);
         public void onStart(ScreenBlank blankActivity);
@@ -268,6 +276,7 @@ public class ScreenBlank extends Activity {
         public void onBackPressed(ScreenBlank blankActivity);
         public void onDestroy(ScreenBlank blankActivity);
         public void onFinish(ScreenBlank blankActivity);
+        public void onActivityResult(ScreenBlank blankActivity, int requestCode, int resultCode, Intent data);
     }
 
     /** supports more stuff related to {@link Activity} */
@@ -291,6 +300,7 @@ public class ScreenBlank extends Activity {
         public void onBackPressed(ScreenBlank blankActivity) {blankActivity.finish();}
         public void onDestroy(ScreenBlank blankActivity) {}
         public void onFinish(ScreenBlank blankActivity) {}
+        public void onActivityResult(ScreenBlank blankActivity, int requestCode, int resultCode, Intent data) {}
     }
 
 }
