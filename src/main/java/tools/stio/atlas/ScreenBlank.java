@@ -31,6 +31,8 @@ import java.util.List;
 import tools.stio.atlas.Atlas.Controller;
 import tools.stio.atlas.Dt.Log;
 
+import static tools.stio.atlas.Atlas.Tools.uiHandler;
+
 /**
  * @author Oleg Orlov
  * @since  08 Jan 2016
@@ -59,8 +61,8 @@ public class ScreenBlank extends Activity {
     private static Class activityClass;
 
     /** @param controller - Fragment or {@link Controller}*/
-    public static void open(Object controller, final Activity activity) {
-        open(controller, (controller instanceof Controller2 ? (Controller2) controller : null), null, activity);
+    public static Intent open(Object controller, final Activity activity) {
+        return open(controller, (controller instanceof Controller2 ? (Controller2) controller : null), null, activity);
     }
 
     /**
@@ -68,16 +70,16 @@ public class ScreenBlank extends Activity {
      * @param controller2 - your impl of Controller2 to get total control of ScreenBlank
      * @param data - any data you want to access later using {@link ScreenBlank#getData()}
      */
-    public static void open(Object controller, Controller2 controller2, Object data, final Activity activity) {
+    public static Intent open(Object controller, Controller2 controller2, Object data, final Activity activity) {
         if (controller2 == null && !(controller instanceof Controller) && !(controller instanceof Controller2)) {
             throw new IllegalArgumentException("Only Controller is supported as first argument. Controller: " + controller + ", controller2: " + controller2);
         }
 
         Class<ScreenBlank> screenBlankClass = activityClass == null ? ScreenBlank.class : activityClass;
-        final Intent imgIntent = new Intent(activity, screenBlankClass);
+        final Intent startIntent = new Intent(activity, screenBlankClass);
         int id = activityId++;
         String key = "" + screenBlankClass + "." + id;
-        imgIntent.putExtra(ACTIVITY_KEY, key);
+        startIntent.putExtra(ACTIVITY_KEY, key);
 
         ActivityEntry entry = new ActivityEntry();
         entry.controller = controller;
@@ -85,12 +87,13 @@ public class ScreenBlank extends Activity {
         entry.data = data;
 
         activityData.put(key, entry);
-        activity.runOnUiThread(new Runnable() {
+        uiHandler.post(new Runnable() {
             public void run() {
-                activity.startActivity(imgIntent);
+                activity.startActivity(startIntent);
                 if (animate) activity.overridePendingTransition(0, 0);
             }
         });
+        return startIntent;
     }
     public static void setActivityClass(Class activityClass) {
         ScreenBlank.activityClass = activityClass;

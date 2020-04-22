@@ -502,7 +502,7 @@ public class Atlas {
         }
 
         //---------------------------          ----------------------//
-        private static final Handler uiHandler = new Handler(Looper.getMainLooper());
+        /*package private*/ static final Handler uiHandler = new Handler(Looper.getMainLooper());
         private static final ExecutorService httpExecutor = Executors.newCachedThreadPool();
 
         public static Response http(Request req) {
