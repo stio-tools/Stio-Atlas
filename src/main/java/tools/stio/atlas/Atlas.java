@@ -548,6 +548,10 @@ public class Atlas {
                 return new Request(url, HTTP_PUT, null, null);
             }
 
+            public static Request delete(String url) {
+                return new Request(url, HTTP_DELETE, null, null);
+            }
+
             private String url;
             private String httpMethod;
             private String[] headers;
@@ -616,17 +620,16 @@ public class Atlas {
             return result;
         }
 
-        public static abstract class Callback {
-            public abstract void onComplete(Request req, Response rsp, Exception e);
+        public interface Callback {
+            void onComplete(Request req, Response rsp, Exception e);
         }
 
         /*---------------------------          ----------------------*/
         /*                              HTTP                         */
         /*---------------------------          ----------------------*/
 
-        private static final int CONNECTION_TIMEOUT = 10000;
+        private static final int CONNECTION_TIMEOUT = 17000;
         private static final int SOCKET_TIMEOUT = CONNECTION_TIMEOUT;
-        private static final String TAG = Tools.class.getSimpleName();
 
         static SSLSocketFactory sslFactory;
 
@@ -640,9 +643,10 @@ public class Atlas {
             }
         }
 
-        public static final String HTTP_GET = "GET";
-        public static final String HTTP_POST = "POST";
-        public static final String HTTP_PUT = "PUT";
+        public static final String HTTP_GET     = "GET";
+        public static final String HTTP_POST    = "POST";
+        public static final String HTTP_PUT     = "PUT";
+        public static final String HTTP_DELETE  = "DELETE";
 
         public static String httpString(String url, String method, String body, String... headers) throws IOException {
             return Dt.toString(http(url, method, headers, body != null ? body.getBytes() : null).bodyInputStream());
@@ -728,11 +732,11 @@ public class Atlas {
 
                 if (body != null) {
                     if (!HTTP_POST.equals(method) && !HTTP_PUT.equals(method)) {
-                        Log.e(TAG, "http() body cannot be send using " + method);
-                    } else {
-                        httpConn.setDoOutput(true);
-                        streamCopyAndClose(body, httpConn.getOutputStream());
+                        Log.e(TAG, "http() body should not be sent using " + method);
                     }
+
+                    httpConn.setDoOutput(true);
+                    streamCopyAndClose(body, httpConn.getOutputStream());
                 }
             } catch (IOException e) {
                 Log.e(TAG, "http() failed to send request", e);
@@ -794,7 +798,7 @@ public class Atlas {
             if (pairs != null && pairs.length % 2 != 0) throw new IllegalArgumentException("should have valid key-value pairs. length: " + pairs.length);
         }
 
-        /** Convinient class for HTTP responses */
+        /** Convenient class for HTTP responses */
         public static class Response {
             private String url;
             private long duration;
