@@ -52,6 +52,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
@@ -351,7 +352,7 @@ public class Atlas {
             public String toString(Object what) {
                 View v = (View) what;
                 int id = v.getId();
-                String fieldName = getField(id, R.id.class);
+                String fieldName = findField(id, R.id.class);
                 Rect vr = new Rect();
                 v.getGlobalVisibleRect(vr);
                 return "" + fieldName + " / " + v.getClass().getSimpleName()
@@ -1172,13 +1173,12 @@ public class Atlas {
             return false;
         }
 
-        public static String findField(Object id, Class... classes) {
-            if (classes == null) return null;
+        public static String findField(Object id, Class clazz, String contains) {
             StringBuilder sb = new StringBuilder("[");
-            for (int i = 0 ; i < classes.length ; i++) {
-                String fieldName = getField(id, classes[i]);
-                if (fieldName != null) {
-                    sb.append(sb.length() == 0 ? "" : ", ");
+            List<String> fieldNames = findStaticFieldName(id, clazz, true);
+            for (String fieldName : fieldNames) {
+                if (contains == null || fieldName.contains(contains)) {
+                    sb.append(sb.length() == 1/*[*/ ? "" : ", ");
                     sb.append(fieldName);
                 }
             }
@@ -1186,22 +1186,42 @@ public class Atlas {
             return sb.toString();
         }
 
-        public static String getField(Object id, Class clazz) {
-            String TAG = "TAG";
-            String fieldName = null;
+        public static String findField(Object id, Class... classes) {
+            if (classes == null) return null;
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0 ; i < classes.length ; i++) {
+                List<String> fieldNames = findStaticFieldName(id, classes[i], true);
+                for (String fieldName : fieldNames) {
+                    sb.append(sb.length() == 1/*[*/ ? "" : ", ");
+                    sb.append(fieldName);
+                }
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+
+        public static String getField(Object byValue, Class clazz) {
+            List<String> fieldNames = findStaticFieldName(byValue, clazz, false);
+            return fieldNames.size() > 0 ? fieldNames.get(0) : null;
+        }
+
+        public static ArrayList<String> findStaticFieldName(Object byValue, Class clazz, boolean findAll) {
+            ArrayList<String> results = new ArrayList<String>();
             try {
                 Field[] fields = clazz.getFields();
                 for (int i = 0 ; i < fields.length; i++) {
-                    Object value = fields[i].get(null);
-                    if (value != null && value.equals(id)) {
-                        fieldName = fields[i].getName();
-                        break;
+                    if (!Modifier.isStatic(fields[i].getModifiers())) continue;
+
+                    Object fValue = fields[i].get(null);
+                    if (fValue != null && fValue.equals(byValue)) {
+                        results.add(fields[i].getName());
+                        if (!findAll) break;
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "getFieldByValue() failed to find field for value: " + id, e);
+                Log.e(TAG, "findStaticFieldName() failed to find field for value: " + byValue, e);
             }
-            return fieldName;
+            return results;
         }
 
         public static boolean contains(Object[] arr, Object what) {
