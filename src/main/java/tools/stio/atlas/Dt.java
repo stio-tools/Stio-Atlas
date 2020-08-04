@@ -680,6 +680,22 @@ public class Dt {
         return Base64.decode64(from, Base64.decode64);
     }
 
+    public static String encode64Url(byte[] data) {
+        return Base64.encode64(data, Base64.encode64Url);
+    }
+
+    public static byte[] decode64url(String from) {
+        return Base64.decode64(from, Base64.decode64Url);
+    }
+
+    public static byte[] trimLeadingZeros(byte[] from) {
+        for (int i = 0; i < from.length; i++) {
+            if (from[i] == 0) continue;
+            return Arrays.copyOfRange(from, i, from.length);
+        }
+        return new byte[0];
+    }
+
     public static class Log {
         private static final String TAG = "Dt";
 
