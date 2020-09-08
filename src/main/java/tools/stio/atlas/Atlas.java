@@ -69,7 +69,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -78,6 +77,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -112,36 +112,6 @@ public class Atlas {
 
     public static final Atlas.DownloadQueue downloadQueue = new DownloadQueue(2);
     public static final ImageLoader imageLoader = new ImageLoader();
-
-    public static String getInitials(Participant p) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(p.getFirstName() != null && p.getFirstName().trim().length() > 0 ? p.getFirstName().trim().charAt(0) : "");
-        sb.append(p.getLastName() != null && p.getLastName().trim().length() > 0 ? p.getLastName().trim().charAt(0) : "");
-        return sb.toString();
-    }
-
-    public static String getFirstNameLastInitial(Participant p) {
-        StringBuilder sb = new StringBuilder();
-        if (p.getFirstName() != null && p.getFirstName().trim().length() > 0) {
-            sb.append(p.getFirstName().trim());
-        }
-        if (p.getLastName() != null && p.getLastName().trim().length() > 0) {
-            sb.append(" ").append(p.getLastName().trim().charAt(0));
-            sb.append(".");
-        }
-        return sb.toString();
-    }
-
-    public static String getFullName(Participant p) {
-        StringBuilder sb = new StringBuilder();
-        if (p.getFirstName() != null && p.getFirstName().trim().length() > 0) {
-            sb.append(p.getFirstName().trim());
-    }
-        if (p.getLastName() != null && p.getLastName().trim().length() > 0) {
-            sb.append(" ").append(p.getLastName().trim());
-        }
-        return sb.toString();
-    }
 
     public static AtlasDrawable imageFromUrl(String url) {
         if (url == null) throw new IllegalArgumentException("url cannot be null");
@@ -214,95 +184,6 @@ public class Atlas {
         return timeBarDayText;
     }
 
-    /**
-     * Participant allows Atlas classes to display information about users, like Message senders,
-     * Conversation participants, TypingIndicator users, etc.
-     */
-    public interface Participant {
-        /**
-         * Returns the first name of this Participant.
-         * 
-         * @return The first name of this Participant
-         */
-        String getFirstName();
-
-        /**
-         * Returns the last name of this Participant.
-         *
-         * @return The last name of this Participant
-         */
-        String getLastName();
-        
-        /**
-         * Returns drawable to be used as paprticipant's avatar in Atlas Views.
-         * If undefined, initials would be used instead.
-         * 
-         * @return drawable, or null 
-         */
-        android.graphics.drawable.Drawable getAvatarDrawable();
-        
-        public static Comparator<Participant> COMPARATOR = new FilteringComparator("");
-    }
-
-    /**
-     * ParticipantProvider provides Atlas classes with Participant data.
-     */
-    public interface ParticipantProvider {
-        /**
-         * Returns a map of all Participants by their unique ID who match the provided `filter`, or
-         * all Participants if `filter` is `null`.  If `result` is provided, it is operated on and
-         * returned.  If `result` is `null`, a new Map is created and returned.
-         *
-         * @param filter - <b>null</b> or filter to apply to Participants (generally text from quick-search box)
-         * @param result - <b>null</b> map to place results. If null, new instance needs to be created
-         * @return result - map of all matching Participants keyed by userId
-         *
-         * <p>TODO: drop "return value", use not-null "result" map everywhere
-         * Why: re-use user-generated Map instance may be helpfull for full-contact list, but it would be
-         * modified by user's code during next getParticipants call with filter
-         * </p>
-         */
-        Map<String, Participant> getParticipants(String filter, Map<String, Participant> result);
-
-        /**
-         * Returns the Participant with the given ID, or `null` if the participant is not yet
-         * available.
-         *
-         * @return The Participant with the given ID, or `null` if not available.
-         */
-        Atlas.Participant getParticipant(String userId);
-    }
-
-    public static final class FilteringComparator implements Comparator<Atlas.Participant> {
-        private final String filter;
-    
-        /**
-         * @param filter - the less indexOf(filter) the less order of participant
-         */
-        public FilteringComparator(String filter) {
-            this.filter = filter;
-        }
-    
-        @Override
-        public int compare(Atlas.Participant lhs, Atlas.Participant rhs) {
-            int result = subCompareCaseInsensitive(lhs.getFirstName(), rhs.getFirstName());
-            if (result != 0) return result;
-            return subCompareCaseInsensitive(lhs.getLastName(), rhs.getLastName());
-        }
-    
-        private int subCompareCaseInsensitive(String lhs, String rhs) {
-            int left = lhs != null ? lhs.toLowerCase().indexOf(filter) : -1;
-            int right = rhs != null ? rhs.toLowerCase().indexOf(filter) : -1;
-    
-            if (left == -1 && right == -1) return 0;
-            if (left != -1 && right == -1) return -1;
-            if (left == -1 && right != -1) return 1;
-            if (left - right != 0) return left - right;
-            return String.CASE_INSENSITIVE_ORDER.compare(lhs, rhs);
-        }
-    }
-
-
     public static final class Tools {
         private static final String TAG = Tools.class.getSimpleName();
 
@@ -314,6 +195,8 @@ public class Atlas {
         /** Ensure you decrease value returned by Calendar.get(Calendar.DAY_OF_WEEK) by 1. Calendar's days starts from 1. */
         public static final String[] TIME_WEEKDAYS_NAMES = new String[] {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
         public static final BitmapDrawable EMPTY_DRAWABLE = new BitmapDrawable(Bitmap.createBitmap(new int[] { Color.TRANSPARENT }, 1, 1, Bitmap.Config.ALPHA_8));
+
+        /*package private*/ static final Handler uiHandler = new Handler(Looper.getMainLooper());
 
         public static String toString(MotionEvent event) {
             StringBuilder sb = new StringBuilder();
@@ -420,6 +303,23 @@ public class Atlas {
             return null;
         }
 
+        public static String toStringSpec(int measureSpec) {
+            switch (MeasureSpec.getMode(measureSpec)) {
+                case MeasureSpec.AT_MOST : return "" + MeasureSpec.getSize(measureSpec) + ".A";
+                case MeasureSpec.EXACTLY : return "" + MeasureSpec.getSize(measureSpec) + ".E";
+                default                  : return "" + MeasureSpec.getSize(measureSpec) + ".U";
+            }
+        }
+
+        public static String toStringSpec(int widthSpec, int heightSpec) {
+            return toStringSpec(widthSpec) + "|" + toStringSpec(heightSpec);
+        }
+
+        //---------------------------          ----------------------//
+        //--------------------------- Streams  ----------------------//
+        //---------------------------          ----------------------//
+        private static final int STREAM_COPY_DEFAULT_BUFSIZE = 65536;
+
         public static void closeQuietly(InputStream stream) {
             if (stream == null) return;
             try {
@@ -438,7 +338,14 @@ public class Atlas {
          * @return number of copied bytes
          */
         public static int streamCopyAndClose(InputStream from, OutputStream to) throws IOException {
-            int totalBytes = streamCopy(from, to);
+            return streamCopyAndClose(from, to, READ_WRITE_PROGRESS_NOOP);
+        }
+
+        /**
+         * @return number of copied bytes
+         */
+        public static int streamCopyAndClose(InputStream from, OutputStream to, ReadWriteProgress rwProgress) throws IOException {
+            int totalBytes = streamCopy(from, to, STREAM_COPY_DEFAULT_BUFSIZE, rwProgress);
             from.close();
             to.close();
             return totalBytes;
@@ -478,36 +385,80 @@ public class Atlas {
         }
 
         /**
+         * @param rwProgress - must be non-null: use {@link #READ_WRITE_PROGRESS_NOOP} instead
          * @return number of copied bytes
          */
-        public static int streamCopy(InputStream from, OutputStream to) throws IOException {
-            byte[] buffer = new byte[65536];
+        public static int streamCopy(InputStream from, OutputStream to, int bufSize, ReadWriteProgress rwProgress) throws IOException {
+            byte[] buffer = new byte[bufSize];
             int bytesRead = 0;
             int totalBytes = 0;
-            for (; (bytesRead = from.read(buffer)) != -1; totalBytes += bytesRead) {
+            for (; (bytesRead = from.read(buffer)) != -1; ) {
+                rwProgress.onStreamReadWrite(totalBytes + bytesRead, totalBytes);
                 to.write(buffer, 0, bytesRead);
+                totalBytes += bytesRead;
+                rwProgress.onStreamReadWrite(totalBytes, totalBytes);
             }
             return totalBytes;
         }
 
-        public static String toStringSpec(int measureSpec) {
-            switch (MeasureSpec.getMode(measureSpec)) {
-                case MeasureSpec.AT_MOST : return "" + MeasureSpec.getSize(measureSpec) + ".A";
-                case MeasureSpec.EXACTLY : return "" + MeasureSpec.getSize(measureSpec) + ".E";
-                default                  : return "" + MeasureSpec.getSize(measureSpec) + ".U";
+        /**
+         * @return number of copied bytes
+         */
+        public static int streamCopy(InputStream from, OutputStream to) throws IOException {
+            return streamCopy(from, to, STREAM_COPY_DEFAULT_BUFSIZE, READ_WRITE_PROGRESS_NOOP);
+        }
+
+        /** Better than <b>null</b> for {@link #streamCopy(InputStream, OutputStream)} operations */
+        public static final ReadWriteProgress READ_WRITE_PROGRESS_NOOP = new ReadWriteProgress(){public void onStreamReadWrite(long read, long written) { }};
+
+        /**
+         * Use for {@link #streamCopy(InputStream, OutputStream)} to report copy progress
+         */
+        public interface ReadWriteProgress {
+            /** reports on every stream read or write total amount of bytes processed by each op */
+            void onStreamReadWrite(long read, long written);
+        }
+
+        public static class ReadWriteProgressOnUI implements ReadWriteProgress, Runnable {
+            AtomicLong read     = new AtomicLong(0);
+            AtomicLong written  = new AtomicLong(0);
+            volatile boolean scheduled = false;
+
+            ReadWriteProgress onUI;
+
+            public ReadWriteProgressOnUI(ReadWriteProgress onUI) {
+                this.onUI = onUI;
+            }
+
+            public void onStreamReadWrite(long read, long written) {
+                this.read.set(read);
+                this.written.set(written);
+                if (!scheduled) {
+                    scheduled = true;
+                    uiHandler.post(this);
+                }
+            }
+
+            public void run() {
+                scheduled = false;
+                onUI.onStreamReadWrite(read.get(), written.get());
             }
         }
 
-        public static String toStringSpec(int widthSpec, int heightSpec) {
-            return toStringSpec(widthSpec) + "|" + toStringSpec(heightSpec);
+        public static ReadWriteProgress onUI(ReadWriteProgress progress) {
+            return new ReadWriteProgressOnUI(progress);
         }
 
-        //---------------------------          ----------------------//
-        /*package private*/ static final Handler uiHandler = new Handler(Looper.getMainLooper());
+        //-------------------                         ---------------//
+        //-------------------         H T T P         ---------------//
+        //-------------------                         ---------------//
         private static final ExecutorService httpExecutor = Executors.newCachedThreadPool();
 
         public static Response http(Request req) {
-            Response rsp = http(req.url, req.httpMethod, req.headers, req.body);
+            Response rsp = http(req.url, req.httpMethod, req.headers, req.body
+                , req.uploadProgress    != null ? req.uploadProgress    : READ_WRITE_PROGRESS_NOOP
+                , req.downloadProgress  != null ? req.downloadProgress  : READ_WRITE_PROGRESS_NOOP
+            );
             if (req.body != null && req.body.markSupported()) try {
                 req.body.reset();
             } catch (IOException ignored) { }
@@ -561,6 +512,8 @@ public class Atlas {
             private Response rsp;
             private Callback callback;
 
+            private ReadWriteProgress uploadProgress;
+            private ReadWriteProgress downloadProgress;
 
             public Request(String url, String httpMethod, String[] headers, byte[] body) {
                 this.url = url;
@@ -587,6 +540,16 @@ public class Atlas {
 
             public Request body(InputStream is) {
                 this.body = is;
+                return this;
+            }
+
+            public Request uploadProgress(ReadWriteProgress uploadProgress) {
+                this.uploadProgress = uploadProgress;
+                return this;
+            }
+
+            public Request downloadProgress(ReadWriteProgress downloadProgress) {
+                this.downloadProgress = downloadProgress;
                 return this;
             }
 
@@ -624,10 +587,6 @@ public class Atlas {
         public interface Callback {
             void onComplete(Request req, Response rsp, Exception e);
         }
-
-        /*---------------------------          ----------------------*/
-        /*                              HTTP                         */
-        /*---------------------------          ----------------------*/
 
         private static final int CONNECTION_TIMEOUT = 17000;
         private static final int SOCKET_TIMEOUT = CONNECTION_TIMEOUT;
@@ -695,7 +654,15 @@ public class Atlas {
         }
 
         public static Response http(String url, String method, String[] headers, InputStream body) {
+            return http(url, method, headers, body, READ_WRITE_PROGRESS_NOOP, READ_WRITE_PROGRESS_NOOP);
+        }
+
+        public static Response http(String url, String method, String[] headers, InputStream body, ReadWriteProgress uploadProgress, ReadWriteProgress downloadProgress) {
+            if (uploadProgress == null) throw new IllegalArgumentException("uploadProgress must be specified. Use READ_WRITE_PROGRESS_NOOP to ignore progress");
+            if (downloadProgress == null) throw new IllegalArgumentException("downloadProgress must be specified. Use READ_WRITE_PROGRESS_NOOP to ignore progress");
+
             checkPairs(headers);
+
             URL urlToOpen;
             try {urlToOpen = new URL(url);} catch (MalformedURLException e) {throw new IllegalArgumentException("url is malformed. url: " + url, e);}
             long startedAt = System.currentTimeMillis();
@@ -737,7 +704,7 @@ public class Atlas {
                     }
 
                     httpConn.setDoOutput(true);
-                    streamCopyAndClose(body, httpConn.getOutputStream());
+                    streamCopyAndClose(body, httpConn.getOutputStream(), uploadProgress);
                 }
             } catch (IOException e) {
                 Log.e(TAG, "http() failed to send request", e);
@@ -765,7 +732,7 @@ public class Atlas {
                 if (responseCode >= 200 && responseCode < 400) {
                     InputStream is = httpConn.getInputStream();
                     ByteArrayOutputStream baos = new ByteArrayOutputStream(is.available());
-                    streamCopy(is, baos);
+                    streamCopy(is, baos, STREAM_COPY_DEFAULT_BUFSIZE, downloadProgress);
                     byte[] bytes = baos.toByteArray();
                     if (debug) Log.i(TAG, "http() " + String.format("%5d", bytes.length) + " bytes received:\n" + Dt.encode64(bytes));
                     rsp.bodyBytes = bytes;

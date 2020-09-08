@@ -18,7 +18,6 @@ package tools.stio.atlas;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
-import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.IOException;
