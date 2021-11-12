@@ -126,6 +126,7 @@ public class Dt {
 
     private static void toString(Cursor cur, Column[] cols, StringBuilder sb) {
         int savedPos = cur.getPosition();
+        // stretch col width to fit longest value
         cur.moveToPosition(-1);
         for (int rowNum = 0; rowNum == 0 ? cur.moveToFirst() : cur.moveToNext(); rowNum++) {
             for (int iCol = 0; iCol < cur.getColumnCount(); iCol++) {
@@ -136,13 +137,13 @@ public class Dt {
                     col.width = width < COL_WIDTH_MAX ? width : COL_WIDTH_MAX;
             }
         }
-
+        // print header
         Dt.printInWidth("" + (cur.getCount() > 0 ? cur.getCount() : "E"), 4, sb, '_', Dt.DIR_CENTER);
         for (Column col : cols) {
             sb.append(" ");
             Dt.printInWidthL(col.name, col.width, sb);
         }
-
+        // print rows
         for (int rowNum = 0; rowNum == 0 ? cur.moveToFirst() : cur.moveToNext(); rowNum++) {
             sb.append("\n");
             Dt.printInWidthL(rowNum + ":", 4, sb);
@@ -559,7 +560,7 @@ public class Dt {
 
         String getValue(Cursor cur, int iCol) {
             String value = "";
-            if      ("INTEGER".equals(type)) value = String.valueOf(cur.getInt(iCol));
+            if      ("INTEGER".equals(type)) value = String.valueOf(cur.getLong(iCol));
             else if ("FLOAT".equals(type)) value = String.valueOf(cur.getFloat(iCol));
             else if ("BLOB".equals(type))
                 value = cur.getBlob(iCol) == null ? "" : bytesToHexChars(cur.getBlob(iCol), COL_WIDTH_MAX);
