@@ -46,7 +46,8 @@ public class ScreenBlank extends Activity {
 
     private static final String ACTIVITY_KEY = "#activityKey";
 
-    protected Controller2 controllerImpl;
+    protected Object        controller;       // for reporting purposes only
+    protected Controller2   controllerImpl;
 
     private ViewGroup rootView;
     private View backgroundView;
@@ -123,6 +124,7 @@ public class ScreenBlank extends Activity {
         }
 
         Object controller = entry.controller;
+        this.controller = controller;
 
         if (entry.controller2 != null) {
             if (entry.controller2 instanceof Controller2Impl) {
@@ -131,7 +133,7 @@ public class ScreenBlank extends Activity {
             this.controllerImpl = entry.controller2;
             this.controllerImpl.onCreate(this, savedInstanceState);
 
-        } else {    /** Controller or Fragment*/
+        } else {    /* Controller or Fragment*/
 
             setContentView(R.layout.screen_blank);
 
