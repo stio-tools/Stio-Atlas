@@ -20,9 +20,14 @@ import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
@@ -33,9 +38,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Dump tool
@@ -706,8 +715,13 @@ public class Dt {
         public static final int ERROR = android.util.Log.ERROR;
 
         private static LogBack log;
+        private static int LEVEL = VERBOSE;
 
         static {
+            initLogger();
+        }
+
+        private static void initLogger() {
             try {
                 log = new LogBackAndroid();
                 log.d("Dt.Log", "Found Android/LogCat. Using LogBackAndroid");
@@ -732,6 +746,33 @@ public class Dt {
             }
         }
 
+        private static String mapPriority(int priority) {
+            switch (priority) {
+                case android.util.Log.VERBOSE:
+                    return "V";
+                case android.util.Log.DEBUG:
+                    return "D";
+                case android.util.Log.INFO:
+                    return "I";
+                case android.util.Log.WARN:
+                    return "W";
+                case android.util.Log.ERROR:
+                    return "E";
+                case android.util.Log.ASSERT:
+                    return "A";
+                default:
+                    return "I";
+            }
+        }
+
+        public static void setLogger(LogBack logBack) {
+            log = logBack;
+        }
+
+        public static void setLevel(int level) {
+            LEVEL = level;
+        }
+
         public static Tag tag(String tagName) {
             return new Tag(tagName, null, false);
         }
@@ -749,6 +790,7 @@ public class Dt {
         }
 
         public static void v(Object tag, String what) {
+            if (LEVEL > VERBOSE) return;
             if (tag.getClass() == Tag.class) {
                 log.v(((Tag)tag).tagName, what(what));
             } else if (tag.getClass() == String.class) {
@@ -757,6 +799,7 @@ public class Dt {
         }
 
         public static void v(Object tag, String what, Throwable e) {
+            if (LEVEL > VERBOSE) return;
             if (tag.getClass() == Tag.class) {
                 log.v(((Tag)tag).tagName, what(what), e);
             } else if (tag.getClass() == String.class) {
@@ -765,6 +808,7 @@ public class Dt {
         }
 
         public static void d(Object tag, String what, Throwable e) {
+            if (LEVEL > DEBUG) return;
             if (tag.getClass() == Tag.class) {
                 log.d(((Tag)tag).tagName, what(what), e);
             } else if (tag.getClass() == String.class) {
@@ -773,6 +817,7 @@ public class Dt {
         }
 
         public static void d(Object tag, String what) {
+            if (LEVEL > DEBUG) return;
             if (tag.getClass() == Tag.class) {
                 log.d(((Tag)tag).tagName, what(what));
             } else if (tag.getClass() == String.class) {
@@ -781,6 +826,7 @@ public class Dt {
         }
 
         public static void i(Object tag, String what) {
+            if (LEVEL > INFO) return;
             if (tag.getClass() == Tag.class) {
                 log.i(((Tag)tag).tagName, what(what));
             } else if (tag.getClass() == String.class) {
@@ -789,6 +835,7 @@ public class Dt {
         }
 
         public static void w(Object tag, String what) {
+            if (LEVEL > WARN) return;
             if (tag.getClass() == Tag.class) {
                 log.w(((Tag)tag).tagName, what(what));
             } else if (tag.getClass() == String.class) {
@@ -797,6 +844,7 @@ public class Dt {
         }
 
         public static void w(Object tag, String what, Throwable e) {
+            if (LEVEL > WARN) return;
             if (tag.getClass() == Tag.class) {
                 log.w(((Tag)tag).tagName, what(what), e);
             } else if (tag.getClass() == String.class) {
@@ -805,6 +853,7 @@ public class Dt {
         }
 
         public static void e(Object tag, String what) {
+            if (LEVEL > ERROR) return;
             if (tag.getClass() == Tag.class) {
                 log.e(((Tag)tag).tagName, what(what));
             } else if (tag.getClass() == String.class) {
@@ -813,6 +862,7 @@ public class Dt {
         }
 
         public static void e(Object tag, String what, Throwable e) {
+            if (LEVEL > ERROR) return;
             if (tag.getClass() == Tag.class) {
                 log.e(((Tag)tag).tagName, what(what), e);
             } else if (tag.getClass() == String.class) {
@@ -848,38 +898,9 @@ public class Dt {
         }
 
         public static abstract class LogBack {
-            public abstract void v(String tag, String what);
-            public abstract void v(String tag, String what, Throwable e);
-            public abstract void d(String tag, String what);
-            public abstract void d(String tag, String what, Throwable e);
-            public abstract void i(String tag, String what);
-            public abstract void i(String tag, String what, Throwable e);
-            public abstract void w(String tag, String what);
-            public abstract void w(String tag, String what, Throwable e);
-            public abstract void e(String tag, String what);
-            public abstract void e(String tag, String what, Throwable e);
-        }
+            protected static final boolean ENABLED = true;/*BuildConfig.DEBUG*/;
 
-        public static class LogBackAndroid extends LogBack {
-            private static final boolean ENABLED = true;/*BuildConfig.DEBUG*/;
-
-            /**
-             #define LOGGER_ENTRY_MAX_LEN        (4*1024)
-             #define LOGGER_ENTRY_MAX_PAYLOAD (LOGGER_ENTRY_MAX_LEN - sizeof(struct logger_entry))                            int to = from + 2048;
-             */
-            private static void log(int priority, String TAG, String what, Throwable e) {
-                if (e != null) {
-                    what = what + "\n" + android.util.Log.getStackTraceString(e);
-                }
-
-                for (int from = 0; from < what.length(); ) {
-                    int to = from + 3072;
-                    if (to > what.length()) to = what.length();
-                    String sub = what.substring(from, to);
-                    android.util.Log.println(priority, TAG, sub);
-                    from = to;
-                }
-            }
+            protected abstract void log(int priority, String TAG, String what, Throwable e);
 
             public void v(String tag, String what) {
                 if (ENABLED) log(android.util.Log.VERBOSE, tag, what, null);
@@ -900,7 +921,7 @@ public class Dt {
             public void i(String tag, String what) {
                 if (ENABLED) log(android.util.Log.INFO, tag, what, null);
             }
-            
+
             public void i(String tag, String what, Throwable e) {
                 if (ENABLED) log(android.util.Log.INFO, tag, what, e);
             }
@@ -908,67 +929,103 @@ public class Dt {
             public void w(String tag, String what) {
                 if (ENABLED) log(android.util.Log.WARN, tag, what, null);
             }
-            
+
             public void w(String tag, String what, Throwable e) {
                 if (ENABLED) log(android.util.Log.WARN, tag, what, e);
             }
-            
+
             public void e(String tag, String what) {
                 if (ENABLED) log(android.util.Log.ERROR, tag, what, null);
             }
-            
+
             public void e(String tag, String what, Throwable e) {
                 if (ENABLED) log(android.util.Log.ERROR, tag, what, e);
             }
+        }
 
+        public static class MuxedLogBack extends LogBack {
+            private class PriorityLogback implements Comparable<PriorityLogback> {
+                public int priority;
+                public LogBack logBack;
+
+                public PriorityLogback(LogBack logBack, int priority) {
+                    this.priority = priority;
+                    this.logBack = logBack;
+                }
+
+                @Override
+                public int compareTo(PriorityLogback another) {
+                    return priority - another.priority;
+                }
+            }
+
+            private ArrayList<PriorityLogback> logBacks = new ArrayList<PriorityLogback>();
+
+            public MuxedLogBack(LogBack logBacks[], int startPriority) {
+                for (int i = 0; i < logBacks.length; i++) {
+                    this.logBacks.add(new PriorityLogback(logBacks[i], startPriority + i));
+                }
+            }
+
+            public MuxedLogBack(LogBack logBacks[]) {
+                this(logBacks, 0);
+            }
+
+            @Override
+            protected synchronized void log(int priority, String TAG, String what, Throwable e) {
+                for (PriorityLogback logback : logBacks) {
+                    logback.logBack.log(priority, TAG, what, e);
+                }
+            }
+
+            public synchronized void add(LogBack logBack, int priority) {
+                logBacks.add(new PriorityLogback(logBack, priority));
+                Collections.sort(logBacks);
+            }
+
+            public synchronized boolean remove(LogBack logBack) {
+                for (int i = 0; i < this.logBacks.size(); i++) {
+                    if (logBacks.get(i).logBack == logBack) {
+                        this.logBacks.remove(i);
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            public synchronized void removeAll() {
+                logBacks.clear();
+            }
+        }
+
+        public static class LogBackAndroid extends LogBack {
+            @Override
+            protected void log(int priority, String TAG, String what, Throwable e) {
+                if (e != null) {
+                    what = what + "\n" + android.util.Log.getStackTraceString(e);
+                }
+                for (int from = 0; from < what.length(); ) {
+                    int to = from + 3072;
+                    if (to > what.length()) to = what.length();
+                    String sub = what.substring(from, to);
+                    android.util.Log.println(priority, TAG, sub);
+                    from = to;
+                }
+            }
         }
 
         public static class LogBackConsole extends LogBack {
             private static final SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss.SSS");
 
-            public void v(String tag, String what, Throwable e) {
-                System.out.println(what("V", tag, what));
-                e.printStackTrace(System.err);
-            }
-
-            public void v(String tag, String what) {
-                System.out.println(what("V", tag, what));
-            }
-            
-            public void d(String tag, String what) {
-                System.out.println(what("D", tag, what));
-            }
-            
-            public void d(String tag, String what, Throwable e) {
-                System.out.println(what("D", tag, what));
-                e.printStackTrace(System.out);
-            }
-            
-            public void i(String tag, String what) {
-                System.out.println(what("I", tag, what));
-            }
-            
-            public void i(String tag, String what, Throwable e) {
-                System.out.println(what("I", tag, what));
-                e.printStackTrace(System.out);
-            }
-            
-            public void w(String tag, String what) {
-                System.out.println(what("W", tag, what));
-            }
-            
-            public void w(String tag, String what, Throwable e) {
-                System.out.println(what("W", tag, what));
-                e.printStackTrace(System.out);
-            }
-            
-            public void e(String tag, String what) {
-                System.err.println(what("E", tag, what));
-            }
-            
-            public void e(String tag, String what, Throwable e) {
-                System.err.println(what("E", tag, what));
-                e.printStackTrace(System.err);
+            @Override
+            protected void log(int priority, String TAG, String what, Throwable e) {
+                if (priority < ERROR) {
+                    System.out.println(what(mapPriority(priority), TAG, what));
+                    if (e != null) e.printStackTrace(System.out);
+                } else {
+                    System.err.println(what(mapPriority(priority), TAG, what));
+                    if (e != null) e.printStackTrace(System.err);
+                }
             }
 
             private static ThreadLocal<StringBuilder>  localSb  = new ThreadLocal<StringBuilder>();
@@ -991,6 +1048,188 @@ public class Dt {
             }
         }
 
+        public static class LogBackStream extends LogBackAndroid {
+
+            static class MessageContainer {
+                public int priority;
+                public  String TAG;
+                public String what;
+
+                public MessageContainer(int priority, String TAG, String what) {
+                    this.priority = priority;
+                    this.TAG = TAG;
+                    this.what = what;
+                }
+            }
+
+            public interface LogCallback {
+                void onLogLineAdded(int length);
+            }
+
+            //Not to confuse with methods parameter TAG
+            private final static String LOG_BACK_FILE_TAG = LogBackStream.class.getSimpleName();
+
+            private final static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
+            private final Queue<MessageContainer> toLog = new LinkedList<MessageContainer>();
+            private final Object lock = new Object();
+            private volatile boolean stopped = false;
+            private LogCallback logCallback;
+
+            public OutputStream outputStream;
+
+            public LogBackStream(OutputStream outputStream) {
+                this.outputStream = outputStream;
+                Executor executor = Executors.newSingleThreadExecutor();
+                Runnable logWriterRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        while (!stopped) {
+                            try {
+                                if (toLog.size() == 0) {
+                                    synchronized (lock) {
+                                        lock.wait();
+                                    }
+                                }
+                                MessageContainer toLogNext = toLog.poll();
+                                if (toLogNext != null) {
+                                    byte[] bytes = toMessageBytes(toLogNext);
+                                    LogBackStream.this.outputStream.write(bytes);
+                                    LogBackStream.this.outputStream.flush();
+                                    if (logCallback != null) {
+                                        logCallback.onLogLineAdded(bytes.length);
+                                    }
+                                }
+                            } catch (InterruptedException e) {
+                                android.util.Log.e(LOG_BACK_FILE_TAG, "Writing to file was interrupted", e);
+                            } catch (IOException e) {
+                                android.util.Log.e(LOG_BACK_FILE_TAG, "Couldn't append line to the log", e);
+                            }
+                        }
+                    }
+                };
+                executor.execute(logWriterRunnable);
+            }
+
+            byte[] toMessageBytes(MessageContainer toLogNext) {
+                StringBuilder message = new StringBuilder(toLogNext.what.length());
+                message
+                        .append(sdf.format(new Date()))
+                        .append(" ")
+                        .append(mapPriority(toLogNext.priority))
+                        .append("/")
+                        .append(toLogNext.TAG)
+                        .append(": ")
+                        .append(toLogNext.what)
+                        .append("\r\n");
+                return message.toString().getBytes();
+            }
+
+            @Override
+            protected void log(int priority, String TAG, String what, Throwable e) {
+                if (e != null) {
+                    what = what + "\n" + android.util.Log.getStackTraceString(e);
+                }
+                toLog.add(new MessageContainer(priority, TAG, what));
+                synchronized (lock) {
+                    lock.notifyAll();
+                }
+            }
+
+            public void stop() {
+                stopped = true;
+                toLog.clear();
+                synchronized (lock) {
+                    lock.notifyAll();
+                }
+            }
+
+            public void setLogCallback(LogCallback logCallback) {
+                this.logCallback = logCallback;
+            }
+        }
+
+        public static class QueueLogger extends LogBack {
+
+            public interface OnNewMessageAvailableListener {
+                void notifyNewMessageAvailable();
+            }
+
+            private final static String LOG_BACK_QUEUE_TAG = QueueLogger.class.getSimpleName();
+
+            private final Queue<Integer> loggedMessagesLength = new LinkedList<Integer>();
+            private final Object lock = new Object();
+
+            private InputStream inputStream;
+            private LogBackStream logBackStream;
+
+            private OnNewMessageAvailableListener listener;
+
+            private byte[] firstMessage = null;
+
+            public QueueLogger(File file) throws FileNotFoundException {
+                logBackStream = new LogBackStream(new FileOutputStream(file));
+                logBackStream.setLogCallback(new LogBackStream.LogCallback() {
+                    @Override
+                    public void onLogLineAdded(int length) {
+                        loggedMessagesLength.add(length);
+                        if (listener != null) {
+                            listener.notifyNewMessageAvailable();
+                        }
+                    }
+                });
+                try {
+                    inputStream = new FileInputStream(file);
+                } catch (FileNotFoundException e) {
+                    android.util.Log.e(LOG_BACK_QUEUE_TAG, "Writing to file was interrupted", e);
+                }
+            }
+
+            @Override
+            protected void log(int priority, String TAG, String what, Throwable e) {
+                logBackStream.log(priority, TAG, what, e);
+            }
+
+            public void setListener(OnNewMessageAvailableListener listener) {
+                this.listener = listener;
+            }
+
+            public byte[] poll() throws IOException {
+                if (firstMessage != null) {
+                    byte[] tmp = firstMessage;
+                    firstMessage = null;
+                    return tmp;
+                }
+                if (loggedMessagesLength.size() == 0) return null;
+                return readNext();
+            }
+
+            byte[] readNext() throws IOException {
+                int nextLineLength = loggedMessagesLength.poll();
+                byte[] buffer = new byte[nextLineLength];
+                int read = 0;
+                while (read < nextLineLength) {
+                    //Might read less then requested according to spec
+                    read += inputStream.read(buffer, read, nextLineLength);
+                }
+                return buffer;
+            }
+
+            public boolean hasNext() {
+                return firstMessage != null || loggedMessagesLength.size() > 0;
+            }
+
+            public byte[] peek() throws IOException {
+                if (firstMessage != null) return firstMessage;
+                if (loggedMessagesLength.size() == 0) return null;
+                firstMessage = readNext();
+                return firstMessage;
+            }
+
+            public int nextMessageLength() {
+                return loggedMessagesLength.size() > 0 ? loggedMessagesLength.peek() : 0;
+            }
+        }
     }
 
     public static class Base64 {
