@@ -716,6 +716,12 @@ public class Dt {
             }
         }
 
+        public static LogBack setLogBack(LogBack logBack) {
+            LogBack existing = log;
+            log = logBack;
+            return existing;
+        }
+
         public static class Tag {
             private final String tagName;
             private String componentName;
