@@ -218,7 +218,10 @@ public class Dt {
         if (frames != -1 && startFrame + frames < lastFrame) lastFrame = startFrame + frames;
         for (int i = startFrame; i <= lastFrame; i++) {
             StackTraceElement trace = traces[i];
-            result.append(i == startFrame ? "" : " <- ").append(Dt.getSimpleClassName(trace.getClassName())).append(".").append(trace.getMethodName()).append("() ");
+            result.append(i == startFrame ? "" : " <- ").append(Dt.getSimpleClassName(trace.getClassName())).append(".").append(trace.getMethodName()).append("()");
+            int lineNumber = trace.getLineNumber();
+            if (lineNumber >= 0) result.append(":").append(lineNumber);
+            result.append(" ");
         }
         return result;
     }
