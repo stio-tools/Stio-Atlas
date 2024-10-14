@@ -364,18 +364,18 @@ public class Dt {
         return toString(items, separator, firstSeparator, printIds, (Adapter)null);
     }
 
-    public static String toString(Collection<?> items, String separator, String firstSeparator, boolean printIds, Adapter adapter) {
+    public static <T> String toString(Collection<T> items, String separator, String firstSeparator, boolean printIds, Adapter<T> adapter) {
         if (items == null) return "null";
         StringBuilder sb = new StringBuilder("[");
         int i = 0;
         int indexWidth = ("" + items.size()).length();
-        for (Iterator<?> itIdx = items.iterator(); itIdx.hasNext(); i++) {
+        for (Iterator<T> itIdx = items.iterator(); itIdx.hasNext(); i++) {
             sb.append(i == 0 ? firstSeparator : separator);
             if (printIds) {
                 if (separator.contains("\n")) Dt.printInWidth(i + ":", indexWidth + 2, sb);
                 else sb.append(i).append(": ");
             }
-            Object item = itIdx.next();
+            T item = itIdx.next();
             sb.append(adapter != null ? adapter.toString(item) : item);
         }
         sb.append(firstSeparator).append("]");
