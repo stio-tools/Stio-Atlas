@@ -22,7 +22,7 @@ import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.RectF;
 import android.util.AttributeSet;
-import android.util.Log;
+import tools.stio.atlas.Dt.Log;
 import android.view.View;
 
 import tools.stio.atlas.Atlas.Tools;
