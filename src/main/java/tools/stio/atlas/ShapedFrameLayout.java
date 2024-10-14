@@ -24,7 +24,7 @@ import android.graphics.Path.Direction;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.util.Log;
+import tools.stio.atlas.Dt.Log;
 import android.view.View;
 import android.widget.FrameLayout;
 

@@ -20,7 +20,7 @@ import android.graphics.ColorFilter;
 import android.graphics.Movie;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
-import android.util.Log;
+import tools.stio.atlas.Dt.Log;
 
 /**
  * @author Oleg Orlov

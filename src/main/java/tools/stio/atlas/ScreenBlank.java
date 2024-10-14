@@ -26,8 +26,6 @@ import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 
 import java.util.HashMap;
-import java.util.List;
-
 import tools.stio.atlas.Atlas.Controller;
 import tools.stio.atlas.Dt.Log;
 
@@ -63,7 +61,12 @@ public class ScreenBlank extends Activity {
 
     /** @param controller - Fragment or {@link Controller}*/
     public static Intent open(Object controller, final Activity activity) {
-        return open(controller, (controller instanceof Controller2 ? (Controller2) controller : null), null, activity);
+        return open(controller,0, activity);
+    }
+
+    /** @param controller - Fragment or {@link Controller}*/
+    public static Intent open(Object controller, int themeId, final Activity activity) {
+        return open(controller, (controller instanceof Controller2 ? (Controller2) controller : null), null, themeId, activity);
     }
 
     /**
@@ -71,7 +74,7 @@ public class ScreenBlank extends Activity {
      * @param controller2 - your impl of Controller2 to get total control of ScreenBlank
      * @param data - any data you want to access later using {@link ScreenBlank#getData()}
      */
-    public static Intent open(Object controller, Controller2 controller2, Object data, final Activity activity) {
+    public static Intent open(Object controller, Controller2 controller2, Object data, int themeId, final Activity activity) {
         if (controller2 == null && !(controller instanceof Controller) && !(controller instanceof Controller2)) {
             throw new IllegalArgumentException("Only Controller is supported as first argument. Controller: " + controller + ", controller2: " + controller2);
         }
@@ -86,6 +89,7 @@ public class ScreenBlank extends Activity {
         entry.controller = controller;
         entry.controller2 = controller2;
         entry.data = data;
+        entry.themeId = themeId;
 
         activityData.put(key, entry);
         uiHandler.post(new Runnable() {
@@ -108,15 +112,22 @@ public class ScreenBlank extends Activity {
         Object controller;
         Controller2 controller2;
         Object data;
+        int themeId = 0;
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         if (debug) Log.w(TAG, "onCreate() savedInstanceState: " + savedInstanceState);
-        super.onCreate(savedInstanceState);
 
         String dataKey = getDataKey();
         ActivityEntry entry = activityData.get(dataKey);
+
+        if (entry != null && entry.themeId != 0) {
+            setTheme(entry.themeId);
+        }
+
+        super.onCreate(savedInstanceState);
 
         if (entry == null) {
             onCreateFailed(dataKey, activityData, savedInstanceState);

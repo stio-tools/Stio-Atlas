@@ -26,6 +26,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
+import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -99,7 +100,7 @@ public class Atlas {
     public static final boolean debug = false;
 
     public static final String METADATA_KEY_CONVERSATION_TITLE = "conversationName";
-    
+
     public static final String MIME_TYPE_ATLAS_LOCATION = "location/coordinate";
     public static final String MIME_TYPE_TEXT = "text/plain";
     public static final String MIME_TYPE_IMAGE_JPEG = "image/jpeg";
@@ -135,9 +136,24 @@ public class Atlas {
         return result;
     }
 
+    public static AtlasDrawable videoThumbFromUrlOrFile(String url, File imageFile) {
+        if (url == null) throw new IllegalArgumentException("url cannot be null");
+        AtlasDrawable result;
+        if (imageFile != null && imageFile.exists() && !imageFile.isDirectory()) {
+            result = new AtlasDrawable(url, imageFile);
+            if (result.inflateImmediately) {
+                result.requestInflate();
+            }
+        } else {
+            result = new AtlasDrawable(url);
+            downloadQueue.schedule(url, imageFile,  result, false, true);
+        }
+        return result;
+    }
+
     /** @return if Today: time. If Yesterday: "Yesterday", if within one week: day of week, otherwise: dateFormat.format() */
     public static String formatTimeShort(Date dateTime, DateFormat timeFormat, DateFormat dateFormat) {
-    
+
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, 0);
         cal.set(Calendar.MINUTE, 0);
@@ -145,10 +161,10 @@ public class Atlas {
         long todayMidnight = cal.getTimeInMillis();
         long yesterMidnight = todayMidnight - Tools.TIME_HOURS_24;
         long weekAgoMidnight = todayMidnight - Tools.TIME_HOURS_24 * 7;
-        
+
         String timeText = null;
         if (dateTime.getTime() > todayMidnight) {
-            timeText = timeFormat.format(dateTime.getTime()); 
+            timeText = timeFormat.format(dateTime.getTime());
         } else if (dateTime.getTime() > yesterMidnight) {
             timeText = "Yesterday";
         } else if (dateTime.getTime() > weekAgoMidnight){
@@ -169,10 +185,10 @@ public class Atlas {
         long todayMidnight = cal.getTimeInMillis();
         long yesterMidnight = todayMidnight - Tools.TIME_HOURS_24;
         long weekAgoMidnight = todayMidnight - Tools.TIME_HOURS_24 * 7;
-        
+
         String timeBarDayText = null;
         if (sentAt.getTime() > todayMidnight) {
-            timeBarDayText = "Today"; 
+            timeBarDayText = "Today";
         } else if (sentAt.getTime() > yesterMidnight) {
             timeBarDayText = "Yesterday";
         } else if (sentAt.getTime() > weekAgoMidnight) {
@@ -1689,7 +1705,7 @@ public class Atlas {
          * {@link #schedule(String, File, CompleteListener)} with <code>first == false</code>
          */
         public void schedule(String url, File toFile, CompleteListener onComplete) {
-            schedule(url, toFile, onComplete, false);
+            schedule(url, toFile, onComplete, false, false);
         }
 
         /**
@@ -1698,7 +1714,7 @@ public class Atlas {
          * @param toFile - if <b>null</b> queue will create temp file and pass it to {@link CompleteListener#onDownloadComplete(String, File)}
          * @param first  - add in the beginning of the queue
          */
-        public void schedule(String url, File toFile, CompleteListener onComplete, boolean first) {
+        public void schedule(String url, File toFile, CompleteListener onComplete, boolean first, boolean isVideo) {
             if (debug) Log.d(TAG, "schedule() url: " + url + " toFile: " + toFile + " onComplete: " + onComplete);
             if (url == null || url.isEmpty()) throw new IllegalArgumentException("url must be defined: [" + url + "], file: " + toFile + ", onComplete: " + onComplete);
 
@@ -1716,7 +1732,7 @@ public class Atlas {
                         queueMonitor.notifyAll();
                     }
                 } else {
-                    Entry toSchedule = new Entry(url, toFile, onComplete);
+                    Entry toSchedule = new Entry(url, toFile, onComplete, isVideo);
                     if (first) {
                         queue.addFirst(toSchedule);
                     } else {
@@ -1754,7 +1770,9 @@ public class Atlas {
                             next.file = downloadTo;
                         }
 
-                        boolean downloaded = Tools.downloadHttpToFile(next.url, downloadTo, sslSocketFactory);
+                        boolean downloaded = next.isVideo
+                            ? downloadVideoFrameToFile(next.url, downloadTo)
+                            : Tools.downloadHttpToFile(next.url, downloadTo, sslSocketFactory);
 
                         if (downloaded) {
                             for (CompleteListener onComplete : next.completeListeners) {
@@ -1770,6 +1788,34 @@ public class Atlas {
                     }
                 }
             }
+        }
+
+
+        public static boolean downloadVideoFrameToFile(String videoPath, File downloadTo) throws Exception {
+            FileOutputStream out = null;
+            try {
+                Bitmap bitmap = retriveVideoFrameFromVideo(videoPath);
+                out = new FileOutputStream(downloadTo);
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                return true;
+            } finally {
+                if (out != null) out.close();
+            }
+        }
+
+        public static Bitmap retriveVideoFrameFromVideo(String videoPath) throws Exception {
+            Bitmap bitmap = null;
+            MediaMetadataRetriever mediaMetadataRetriever = null;
+            try {
+                mediaMetadataRetriever = new MediaMetadataRetriever();
+                mediaMetadataRetriever.setDataSource(videoPath, new HashMap<>());
+                bitmap = mediaMetadataRetriever.getFrameAtTime(1, MediaMetadataRetriever.OPTION_CLOSEST);
+            } finally {
+                if (mediaMetadataRetriever != null) {
+                    mediaMetadataRetriever.release();
+                }
+            }
+            return bitmap;
         }
 
         /** @return true if inProgress or scheduled */
@@ -1806,12 +1852,14 @@ public class Atlas {
         private static class Entry {
             String url;
             File file;
+            boolean isVideo;
             ArrayList<CompleteListener> completeListeners = new ArrayList<Atlas.DownloadQueue.CompleteListener>(3);
             /** @param file - if null DownloadQueue will create tempFile using {@link File#createTempFile(String, String)} }*/
-            public Entry(String url, File file, CompleteListener listener) {
+            public Entry(String url, File file, CompleteListener listener, boolean isVideo) {
                 if (url == null) throw new IllegalArgumentException("url cannot be null");
                 this.url = url;
                 this.file = file;
+                this.isVideo = isVideo;
                 this.completeListeners.add(listener);
             }
         }

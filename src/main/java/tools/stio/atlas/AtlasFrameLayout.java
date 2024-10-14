@@ -29,7 +29,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.util.Log;
+import tools.stio.atlas.Dt.Log;
 import android.view.View;
 import android.widget.FrameLayout;
 
@@ -42,7 +42,7 @@ import android.widget.FrameLayout;
  * 
  * 
  * @author Oleg Orlov
- * @since  08 May 2015
+ * @since   May 2015
  */
 public class AtlasFrameLayout extends FrameLayout {
 
